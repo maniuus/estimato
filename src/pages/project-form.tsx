@@ -21,7 +21,8 @@ export function ProjectForm({ onClose, initialData }: ProjectFormProps): React.R
     status: initialData?.status ?? 'draft' as Project['status'],
     ppn: initialData?.ppn ?? 11,
     overhead: initialData?.overhead ?? 0,
-    note: initialData?.note ?? ''
+    note: initialData?.note ?? '',
+    template: 'blank'
   })
   const [saving, setSaving] = useState(false)
 
@@ -30,7 +31,8 @@ export function ProjectForm({ onClose, initialData }: ProjectFormProps): React.R
     setSaving(true)
 
     if (initialData) {
-      await updateProject(initialData.id, form)
+      const { template, ...updateData } = form
+      await updateProject(initialData.id, updateData)
     } else {
       await createProject(form)
     }
@@ -97,6 +99,57 @@ export function ProjectForm({ onClose, initialData }: ProjectFormProps): React.R
               <label className="block text-xs font-medium text-gray-600 mb-1">Catatan</label>
               <textarea className="input-field" rows={3} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
             </div>
+
+            {!initialData && (
+              <div className="col-span-2 space-y-1.5">
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  Pilih Template Proyek
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <label className={`flex flex-col items-center justify-center p-3 border rounded-lg cursor-pointer transition-all ${form.template === 'blank' ? 'border-blue-600 bg-blue-50/50 ring-1 ring-blue-600' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <input
+                      type="radio"
+                      name="template"
+                      value="blank"
+                      checked={form.template === 'blank'}
+                      onChange={() => setForm({ ...form, template: 'blank' })}
+                      className="sr-only"
+                    />
+                    <span className="text-xl mb-1">📄</span>
+                    <span className="font-bold text-xs text-gray-800">Blank Page</span>
+                    <span className="text-[10px] text-gray-400 text-center mt-0.5 leading-tight">Mulai dari nol</span>
+                  </label>
+
+                  <label className={`flex flex-col items-center justify-center p-3 border rounded-lg cursor-pointer transition-all ${form.template === 'renovasi' ? 'border-blue-600 bg-blue-50/50 ring-1 ring-blue-600' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <input
+                      type="radio"
+                      name="template"
+                      value="renovasi"
+                      checked={form.template === 'renovasi'}
+                      onChange={() => setForm({ ...form, template: 'renovasi' })}
+                      className="sr-only"
+                    />
+                    <span className="text-xl mb-1">🛠️</span>
+                    <span className="font-bold text-xs text-gray-800">Proyek Renovasi</span>
+                    <span className="text-[10px] text-gray-400 text-center mt-0.5 leading-tight">Struktur Renovasi</span>
+                  </label>
+
+                  <label className={`flex flex-col items-center justify-center p-3 border rounded-lg cursor-pointer transition-all ${form.template === 'pembangunan' ? 'border-blue-600 bg-blue-50/50 ring-1 ring-blue-600' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <input
+                      type="radio"
+                      name="template"
+                      value="pembangunan"
+                      checked={form.template === 'pembangunan'}
+                      onChange={() => setForm({ ...form, template: 'pembangunan' })}
+                      className="sr-only"
+                    />
+                    <span className="text-xl mb-1">🏗️</span>
+                    <span className="font-bold text-xs text-gray-800">Pembangunan Baru</span>
+                    <span className="text-[10px] text-gray-400 text-center mt-0.5 leading-tight">Struktur Gedung/Rumah</span>
+                  </label>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2 pt-2">

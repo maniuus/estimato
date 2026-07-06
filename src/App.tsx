@@ -13,8 +13,9 @@ type Page = 'dashboard' | 'projects' | 'master-data' | 'materials' | 'wages' | '
 export default function App(): React.ReactElement {
   const [activePage, setActivePage] = useState<Page>('dashboard')
   const [showProjectForm, setShowProjectForm] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-  const { loadProjects } = useProjectStore()
+  const { projects, loadProjects } = useProjectStore()
 
   useEffect(() => {
     loadProjects()
@@ -35,7 +36,7 @@ export default function App(): React.ReactElement {
       case 'dashboard':
         return (
           <DashboardPage
-            onCreateProject={() => setShowProjectForm(true)}
+            onCreateProject={() => { setIsEditing(false); setShowProjectForm(true) }}
             onSelectProject={handleSelectProject}
           />
         )
@@ -45,11 +46,11 @@ export default function App(): React.ReactElement {
             <ProjectDetailPage
               projectId={selectedProjectId}
               onBack={() => setActivePage('dashboard')}
-              onEdit={() => setShowProjectForm(true)}
+              onEdit={() => { setIsEditing(true); setShowProjectForm(true) }}
             />
           )
         }
-        return <DashboardPage onCreateProject={() => setShowProjectForm(true)} onSelectProject={handleSelectProject} />
+        return <DashboardPage onCreateProject={() => { setIsEditing(false); setShowProjectForm(true) }} onSelectProject={handleSelectProject} />
       case 'master-data':
       case 'materials':
       case 'wages':
@@ -60,14 +61,19 @@ export default function App(): React.ReactElement {
       case 'settings':
         return <SettingsPage />
       default:
-        return <DashboardPage onCreateProject={() => setShowProjectForm(true)} onSelectProject={handleSelectProject} />
+        return <DashboardPage onCreateProject={() => { setIsEditing(false); setShowProjectForm(true) }} onSelectProject={handleSelectProject} />
     }
   }
 
   return (
     <Layout activePage={activePage} onNavigate={handleNavigate}>
       {renderContent()}
-      {showProjectForm && <ProjectForm onClose={() => setShowProjectForm(false)} />}
+      {showProjectForm && (
+        <ProjectForm
+          onClose={() => setShowProjectForm(false)}
+          initialData={isEditing && selectedProjectId ? projects.find(p => p.id === selectedProjectId) : undefined}
+        />
+      )}
     </Layout>
   )
 }

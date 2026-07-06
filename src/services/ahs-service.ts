@@ -6,6 +6,7 @@ export const ahsService = {
   delete: (id: string) => window.api.ahs.delete(id),
   getByProject: (projectId: string) => window.api.ahs.getByProject(projectId),
   getLibrary: () => window.api.ahs.getLibrary(),
+  duplicate: (id: string) => window.api.ahs.duplicate(id),
 
   material: {
     getByAhs: (ahsId: string) => window.api.ahs.material.getByAhs(ahsId),

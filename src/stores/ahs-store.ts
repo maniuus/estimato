@@ -21,6 +21,7 @@ interface AhsActions {
   createAhs: (data: Omit<Ahs, 'id' | 'createdAt' | 'updatedAt' | 'totalPrice'>) => Promise<boolean>
   updateAhs: (id: string, data: Partial<Omit<Ahs, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<boolean>
   deleteAhs: (id: string) => Promise<boolean>
+  duplicateAhs: (id: string) => Promise<boolean>
 
   loadComponents: (ahsId: string) => Promise<void>
   addMaterialComponent: (data: Omit<AhsComponentMaterial, 'id' | 'totalPrice'>) => Promise<boolean>
@@ -104,6 +105,20 @@ const ahsStore = createStore<AhsStore>((set, get) => ({
     if (result.success) {
       if (get().selectedAhs?.id === id) set({ selectedAhs: null, materialComponents: [], wageComponents: [], equipmentComponents: [] })
       await get().loadAll()
+      return true
+    }
+    set({ error: result.error })
+    return false
+  },
+
+  duplicateAhs: async (id) => {
+    const result = await ahsService.duplicate(id)
+    if (result.success && result.data) {
+      const newAhs = result.data
+      const projectId = newAhs.projectId
+      if (projectId) await get().loadByProject(projectId)
+      else await get().loadAll()
+      get().selectAhs(newAhs)
       return true
     }
     set({ error: result.error })

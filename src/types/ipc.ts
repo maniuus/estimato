@@ -55,6 +55,7 @@ interface ElectronApi {
     delete: (id: string) => Promise<ServiceResult<boolean>>
     getByProject: (projectId: string) => Promise<ServiceResult<Ahs[]>>
     getLibrary: () => Promise<ServiceResult<Ahs[]>>
+    duplicate: (id: string) => Promise<ServiceResult<Ahs>>
     material: {
       getByAhs: (ahsId: string, projectId?: string) => Promise<ServiceResult<AhsComponentMaterial[]>>
       create: (data: unknown) => Promise<ServiceResult<AhsComponentMaterial>>

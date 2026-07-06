@@ -65,6 +65,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.AHS_DELETE, (_e, id: string) => ahsService.delete(id))
   ipcMain.handle(IPC_CHANNELS.AHS_GET_BY_PROJECT, (_e, projectId: string) => ahsService.getByProjectId(projectId))
   ipcMain.handle(IPC_CHANNELS.AHS_GET_LIBRARY, () => ahsService.getLibrary())
+  ipcMain.handle(IPC_CHANNELS.AHS_DUPLICATE, (_e, id: string) => ahsService.duplicate(id))
 
   ipcMain.handle(IPC_CHANNELS.AHS_MATERIAL_GET, (_e, ahsId: string, projectId?: string) => ahsService.getMaterialComponents(ahsId, projectId))
   ipcMain.handle(IPC_CHANNELS.AHS_MATERIAL_CREATE, (_e, data) => ahsService.createMaterialComponent(data))

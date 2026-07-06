@@ -13,6 +13,7 @@ export interface Project {
   note: string
   createdAt: string
   updatedAt: string
+  grandTotal?: number
 }
 
 export interface Material {

@@ -59,6 +59,7 @@ const api = {
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.AHS_DELETE, id),
     getByProject: (projectId: string) => ipcRenderer.invoke(IPC_CHANNELS.AHS_GET_BY_PROJECT, projectId),
     getLibrary: () => ipcRenderer.invoke(IPC_CHANNELS.AHS_GET_LIBRARY),
+    duplicate: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.AHS_DUPLICATE, id),
 
     material: {
       getByAhs: (ahsId: string, projectId?: string) => ipcRenderer.invoke(IPC_CHANNELS.AHS_MATERIAL_GET, ahsId, projectId),

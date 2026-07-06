@@ -42,6 +42,7 @@ export const IPC_CHANNELS = {
   AHS_DELETE: 'ahs:delete',
   AHS_GET_BY_PROJECT: 'ahs:getByProject',
   AHS_GET_LIBRARY: 'ahs:getLibrary',
+  AHS_DUPLICATE: 'ahs:duplicate',
 
   // AHS Components
   AHS_MATERIAL_GET: 'ahs:material:getByAhs',

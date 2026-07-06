@@ -52,7 +52,7 @@ export function ProjectList({ onSelectProject }: ProjectListProps): React.ReactE
                 <td className="table-cell font-medium text-gray-900">{project.name}</td>
                 <td className="table-cell">{project.location}</td>
                 <td className="table-cell">{project.year}</td>
-                <td className="table-cell font-mono">{formatCurrency(project.overhead > 0 ? project.overhead : 0)}</td>
+                <td className="table-cell font-mono">{formatCurrency(project.grandTotal ?? 0)}</td>
                 <td className="table-cell">
                   <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[project.status]}`}>
                     {STATUS_LABELS[project.status]}

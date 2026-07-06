@@ -57,6 +57,64 @@ export class AhsService {
     }
   }
 
+  duplicate(id: string): ServiceResult<Ahs> {
+    try {
+      const original = this.ahsRepo.getById(id)
+      if (!original) return failure('AHS original tidak ditemukan')
+
+      let codeSuffix = '-Kustom'
+      let newCode = `${original.code}${codeSuffix}`
+      let counter = 1
+      while (this.ahsRepo.queryOne(`SELECT id FROM "Ahs" WHERE code = @code`, { code: newCode })) {
+        newCode = `${original.code}${codeSuffix}-${counter}`
+        counter++
+      }
+
+      const newAhs = this.ahsRepo.create({
+        code: newCode,
+        name: `${original.name} (Kustom)`,
+        unit: original.unit,
+        category: 'kustom',
+        source: original.source ? `${original.source} (Kustom)` : 'Kustom',
+        projectId: original.projectId
+      })
+
+      const materials = this.materialCompRepo.getByAhsId(original.id)
+      for (const m of materials) {
+        this.materialCompRepo.create({
+          ahsId: newAhs.id,
+          materialId: m.materialId,
+          coefficient: m.coefficient
+        })
+      }
+
+      const wages = this.wageCompRepo.getByAhsId(original.id)
+      for (const w of wages) {
+        this.wageCompRepo.create({
+          ahsId: newAhs.id,
+          wageId: w.wageId,
+          coefficient: w.coefficient
+        })
+      }
+
+      const equipment = this.equipmentCompRepo.getByAhsId(original.id)
+      for (const e of equipment) {
+        this.equipmentCompRepo.create({
+          ahsId: newAhs.id,
+          equipmentId: e.equipmentId,
+          coefficient: e.coefficient
+        })
+      }
+
+      const finalAhs = this.ahsRepo.recalculateTotalPrice(newAhs.id)
+      if (!finalAhs) return failure('Gagal memperbarui total harga AHS baru')
+
+      return success(finalAhs)
+    } catch (e) {
+      return failure((e as Error).message)
+    }
+  }
+
   getByProjectId(projectId: string): ServiceResult<Ahs[]> {
     try {
       return success(this.ahsRepo.getByProjectId(projectId))

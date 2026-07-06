@@ -13,7 +13,7 @@ interface ProjectState {
 interface ProjectActions {
   loadProjects: () => Promise<void>
   selectProject: (project: Project | null) => void
-  createProject: (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>
+  createProject: (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'> & { template?: string }) => Promise<boolean>
   updateProject: (id: string, data: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<boolean>
   deleteProject: (id: string) => Promise<boolean>
 }
