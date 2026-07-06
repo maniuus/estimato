@@ -113,6 +113,9 @@ export function registerIpcHandlers(): void {
 
       const pdfData = await win.webContents.printToPDF({
         printBackground: true,
+        displayHeaderFooter: true,
+        headerTemplate: '<div style="height: 0px;"></div>',
+        footerTemplate: '<div style="font-size: 8px; font-family: \'Inter\', \'Helvetica Neue\', sans-serif; width: 100%; text-align: right; padding-right: 35px; color: #64748b; background-color: white;">Halaman <span class="pageNumber"></span> dari <span class="totalPages"></span></div>',
         margins: {
           marginType: 'default'
         },
