@@ -18,6 +18,7 @@ dist-final/
 dist-output/
 dist-package/
 dist-release/
+dist-prod-package/
 
 # Temporary and system files
 .DS_Store
