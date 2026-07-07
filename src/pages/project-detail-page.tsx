@@ -3,6 +3,7 @@ import { useProjectStore } from '../stores/project-store'
 import { useRabStore } from '../stores/rab-store'
 import { STATUS_LABELS, STATUS_COLORS, formatCurrency } from '../lib/format'
 import { RabInputTab } from './rab-input-tab'
+import { ProjectVolumeTab } from './project-volume-tab'
 import { AhsAnalisaTab } from './ahs-analisa-tab'
 import { BomTab } from './bom-tab'
 import { LaporanPage } from './laporan-page'
@@ -13,7 +14,7 @@ interface ProjectDetailPageProps {
   onEdit: () => void
 }
 
-type ProjectTab = 'info' | 'rab-input' | 'ahs-analisa' | 'bom' | 'laporan'
+type ProjectTab = 'info' | 'volume' | 'rab-input' | 'ahs-analisa' | 'bom' | 'laporan'
 
 export function ProjectDetailPage({ projectId, onBack, onEdit }: ProjectDetailPageProps): React.ReactElement {
   const { projects, loadProjects } = useProjectStore()
@@ -56,19 +57,14 @@ export function ProjectDetailPage({ projectId, onBack, onEdit }: ProjectDetailPa
                 <div className="flex justify-between"><span className="text-gray-500">Lokasi</span><span className="font-semibold text-gray-800">{project.location || '-'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Tahun</span><span className="font-semibold text-gray-800">{project.year}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Tipe Bangunan</span><span className="font-semibold text-gray-800">{project.buildingType || '-'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Luas</span><span className="font-semibold text-gray-800">{project.buildingArea > 0 ? `${project.buildingArea} m²` : '-'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Lantai</span><span className="font-semibold text-gray-800">{project.floors > 0 ? `${project.floors} lantai` : '-'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Lantai</span><span className="font-semibold text-gray-800">{project.floors} Lantai</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">PPN (%)</span><span className="font-semibold text-gray-800">{project.ppn}%</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Overhead (%)</span><span className="font-semibold text-gray-800">{project.overhead}%</span></div>
               </div>
             </div>
-            <div className="card p-4">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Pengaturan Biaya</p>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-500">PPN</span><span className="font-semibold text-gray-800">{project.ppn}%</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Overhead & Laba</span><span className="font-semibold text-gray-800">{project.overhead}%</span></div>
-              </div>
-            </div>
-            <div className="card p-4">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Ringkasan</p>
+            
+            <div className="card p-4 col-span-2">
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Rekapitulasi Biaya</p>
               <div className="mt-3 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-gray-500">Total Pekerjaan</span><span className="font-mono font-bold text-gray-800">{calculation ? calculation.lineItems.length : 0}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-mono font-bold text-gray-800">{calculation ? formatCurrency(calculation.totalPrice) : '-'}</span></div>

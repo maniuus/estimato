@@ -26,8 +26,8 @@ export class VolumeItemRepository extends BaseRepository<VolumeItem> {
     const now = this.now()
 
     this.executeInsert(
-      `INSERT INTO "VolumeItem" (id, wbsItemId, ahsId, volume, unit, formula, notes, createdAt, updatedAt)
-       VALUES (@id, @wbsItemId, @ahsId, @volume, @unit, @formula, @notes, @createdAt, @updatedAt)`,
+      `INSERT INTO "VolumeItem" (id, wbsItemId, ahsId, volume, unit, formula, notes, projectVolumeId, createdAt, updatedAt)
+       VALUES (@id, @wbsItemId, @ahsId, @volume, @unit, @formula, @notes, @projectVolumeId, @createdAt, @updatedAt)`,
       {
         id,
         wbsItemId: data.wbsItemId,
@@ -36,6 +36,7 @@ export class VolumeItemRepository extends BaseRepository<VolumeItem> {
         unit: data.unit ?? '',
         formula: data.formula ?? '',
         notes: data.notes ?? '',
+        projectVolumeId: data.projectVolumeId ?? null,
         createdAt: now,
         updatedAt: now
       }
@@ -88,7 +89,8 @@ export class VolumeItemRepository extends BaseRepository<VolumeItem> {
       volume: data.volume ?? 0,
       unit: data.unit ?? '',
       formula: data.formula ?? '',
-      notes: data.notes ?? ''
+      notes: data.notes ?? '',
+      projectVolumeId: data.projectVolumeId ?? null
     })
   }
 }

@@ -44,7 +44,7 @@
     "appId": "com.masterrab.app",
     "productName": "Master RAB",
     "directories": {
-      "output": "dist"
+      "output": "dist-package"
     },
     "files": [
       "out/**/*",

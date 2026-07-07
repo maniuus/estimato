@@ -13,6 +13,11 @@ node_modules
 # Build outputs
 out
 dist
+dist-build/
+dist-final/
+dist-output/
+dist-package/
+dist-release/
 
 # Temporary and system files
 .DS_Store
@@ -47,3 +52,4 @@ electron.vite.config.*.mjs
 *.njsproj
 *.sln
 *.sw?
+processes.txt

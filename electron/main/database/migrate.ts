@@ -111,18 +111,33 @@ CREATE TABLE IF NOT EXISTS WbsItem (
   FOREIGN KEY (parentId) REFERENCES WbsItem(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS ProjectVolume (
+  id            TEXT PRIMARY KEY,
+  projectId     TEXT NOT NULL,
+  name          TEXT NOT NULL,
+  unit          TEXT DEFAULT '',
+  value         REAL DEFAULT 0,
+  formula       TEXT DEFAULT '',
+  notes         TEXT DEFAULT '',
+  createdAt     TEXT NOT NULL DEFAULT (datetime('now')),
+  updatedAt     TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (projectId) REFERENCES Project(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS VolumeItem (
-  id          TEXT PRIMARY KEY,
-  wbsItemId   TEXT NOT NULL UNIQUE,
-  ahsId       TEXT,
-  volume      REAL DEFAULT 0,
-  unit        TEXT DEFAULT '',
-  formula     TEXT DEFAULT '',
-  notes       TEXT DEFAULT '',
-  createdAt   TEXT NOT NULL DEFAULT (datetime('now')),
-  updatedAt   TEXT NOT NULL DEFAULT (datetime('now')),
+  id              TEXT PRIMARY KEY,
+  wbsItemId       TEXT NOT NULL UNIQUE,
+  ahsId           TEXT,
+  volume          REAL DEFAULT 0,
+  unit            TEXT DEFAULT '',
+  formula         TEXT DEFAULT '',
+  notes           TEXT DEFAULT '',
+  projectVolumeId TEXT,
+  createdAt       TEXT NOT NULL DEFAULT (datetime('now')),
+  updatedAt       TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (wbsItemId) REFERENCES WbsItem(id) ON DELETE CASCADE,
-  FOREIGN KEY (ahsId) REFERENCES Ahs(id) ON DELETE SET NULL
+  FOREIGN KEY (ahsId) REFERENCES Ahs(id) ON DELETE SET NULL,
+  FOREIGN KEY (projectVolumeId) REFERENCES ProjectVolume(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS RabSnapshot (
@@ -172,6 +187,13 @@ export function runMigrations(): void {
 
   for (const stmt of statements) {
     db.run(stmt + ';')
+  }
+
+  // Alter legacy table VolumeItem to add projectVolumeId
+  try {
+    db.run('ALTER TABLE "VolumeItem" ADD COLUMN projectVolumeId TEXT;')
+  } catch (e) {
+    // Column already exists
   }
 
   saveDatabase()

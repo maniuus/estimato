@@ -84,6 +84,12 @@ interface ElectronApi {
     delete: (id: string) => Promise<ServiceResult<boolean>>
   }
 
+  projectVolume: {
+    getByProject: (projectId: string) => Promise<ServiceResult<ProjectVolume[]>>
+    upsert: (projectId: string, data: unknown) => Promise<ServiceResult<ProjectVolume>>
+    delete: (id: string) => Promise<ServiceResult<boolean>>
+  }
+
   rab: {
     calculate: (projectId: string, ppn: number, overhead: number) => Promise<ServiceResult<any>>
     saveSnapshot: (projectId: string, ppn: number, overhead: number) => Promise<ServiceResult<RabSnapshot>>

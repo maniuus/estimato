@@ -67,6 +67,11 @@ export const IPC_CHANNELS = {
   VOLUME_BULK_UPSERT: 'volume:bulkUpsert',
   VOLUME_DELETE: 'volume:delete',
 
+  // Project Volume (Shared Volumes)
+  PROJECT_VOLUME_GET_BY_PROJECT: 'projectVolume:getByProject',
+  PROJECT_VOLUME_UPSERT: 'projectVolume:upsert',
+  PROJECT_VOLUME_DELETE: 'projectVolume:delete',
+
   // RAB
   RAB_CALCULATE: 'rab:calculate',
   RAB_SAVE_SNAPSHOT: 'rab:saveSnapshot',

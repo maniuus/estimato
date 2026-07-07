@@ -4,8 +4,10 @@ import { useVolumeStore } from '../stores/volume-store'
 import { useAhsStore } from '../stores/ahs-store'
 import { useRabStore } from '../stores/rab-store'
 import { useProjectStore } from '../stores/project-store'
+import { useProjectVolumeStore } from '../stores/project-volume-store'
 import { formatCurrency } from '../lib/format'
 import type { WbsItem } from '../types/models'
+import { VolumeCalculatorModal } from '../components/volume-calculator-modal'
 
 interface RabInputTabProps {
   projectId: string
@@ -28,6 +30,7 @@ interface RabRow {
 export function RabInputTab({ projectId }: RabInputTabProps): React.ReactElement {
   const { items: wbsItems, loadByProject: loadWbs, createItem, updateItem, deleteItem, moveItem } = useWbsStore()
   const { items: volumes, loadByProject: loadVolumes, upsert } = useVolumeStore()
+  const { items: projectVolumes, loadByProject: loadProjectVolumes } = useProjectVolumeStore()
   const { ahsList, loadLibrary } = useAhsStore()
   const { calculation, calculate } = useRabStore()
   const { projects } = useProjectStore()
@@ -46,9 +49,40 @@ export function RabInputTab({ projectId }: RabInputTabProps): React.ReactElement
   const [localCategoryNames, setLocalCategoryNames] = useState<Record<string, string>>({})
   const [localRowNames, setLocalRowNames] = useState<Record<string, string>>({})
 
+  // Calculator Modal state
+  const [calculatorOpen, setCalculatorOpen] = useState(false)
+  const [selectedVolItem, setSelectedVolItem] = useState<RabRow | null>(null)
+
+  const handleApplyCalculator = async (volume: number, formulaJson: string, notes: string, projectVolumeId?: string | null) => {
+    if (!selectedVolItem) return
+    const wbsItemId = selectedVolItem.wbsItemId
+    const volItem = volumes.find(v => v.wbsItemId === wbsItemId)
+    
+    await upsert(wbsItemId, {
+      volume: volume,
+      ahsId: volItem?.ahsId ?? null,
+      unit: volItem?.unit ?? selectedVolItem.unit ?? '',
+      formula: formulaJson,
+      notes: notes,
+      projectVolumeId: projectVolumeId !== undefined ? projectVolumeId : (volItem?.projectVolumeId || null)
+    })
+    
+    setLocalVolumes(prev => {
+      const copy = { ...prev }
+      delete copy[wbsItemId]
+      return copy
+    })
+
+    await loadVolumes(projectId)
+    calculate(projectId, ppn, overhead)
+    setCalculatorOpen(false)
+    setSelectedVolItem(null)
+  }
+
   useEffect(() => {
     loadWbs(projectId)
     loadVolumes(projectId)
+    loadProjectVolumes(projectId)
     loadLibrary()
   }, [projectId])
 
@@ -71,15 +105,21 @@ export function RabInputTab({ projectId }: RabInputTabProps): React.ReactElement
   const getRabRowForWbs = (wbs: WbsItem): RabRow => {
     const volItem = volumes.find(v => v.wbsItemId === wbs.id)
     const ahsId = volItem?.ahsId ?? null
-    const volume = volItem?.volume ?? 0
+    
+    // Resolve shared volume if linked
+    const linkedVol = volItem?.projectVolumeId
+      ? projectVolumes.find(pv => pv.id === volItem.projectVolumeId)
+      : null
+
+    const volume = linkedVol ? linkedVol.value : (volItem?.volume ?? 0)
+    const matchedAhs = ahsList.find(a => a.id === ahsId)
+    const unit = linkedVol ? linkedVol.unit : (wbs.unit || matchedAhs?.unit || '')
 
     // Get unit price and total price from backend calculations
     const calcItem = calculation?.lineItems?.find(li => li.wbsItemId === wbs.id)
     
     let unitPrice = calcItem?.unitPrice ?? 0
     let totalPrice = calcItem?.totalPrice ?? 0
-
-    const matchedAhs = ahsList.find(a => a.id === ahsId)
 
     if (!calcItem && ahsId) {
       unitPrice = matchedAhs?.totalPrice ?? 0
@@ -90,7 +130,7 @@ export function RabInputTab({ projectId }: RabInputTabProps): React.ReactElement
       wbsItemId: wbs.id,
       code: wbs.code,
       name: wbs.name,
-      unit: wbs.unit || matchedAhs?.unit || '',
+      unit,
       volume,
       ahsId,
       ahsCode: matchedAhs?.code ?? '',
@@ -103,59 +143,33 @@ export function RabInputTab({ projectId }: RabInputTabProps): React.ReactElement
 
   // WBS Category and Item Grouping Sorter
   const categories = wbsItems.filter(i => i.type === 'group')
-  // Sort categories by their logical sortOrder (creation/sorting order)
   categories.sort((a, b) => a.sortOrder - b.sortOrder)
 
-  interface WbsGroup {
-    category: WbsItem | null // null for uncategorized WBS items
-    displayCode: string
-    rows: RabRow[]
+  // Recursive subtotal calculation
+  const getGroupSubtotal = (groupWbsPath: string) => {
+    const leaves = wbsItems.filter(i => 
+      i.type === 'item' && 
+      (i.wbsPath === groupWbsPath || i.wbsPath.startsWith(groupWbsPath + '.'))
+    )
+    
+    return leaves.reduce((sum, leaf) => {
+      const volItem = volumes.find(v => v.wbsItemId === leaf.id)
+      const linkedVol = volItem?.projectVolumeId
+        ? projectVolumes.find(pv => pv.id === volItem.projectVolumeId)
+        : null
+      const volume = linkedVol ? linkedVol.value : (volItem?.volume ?? 0)
+      const calcItem = calculation?.lineItems?.find(li => li.wbsItemId === leaf.id)
+      let unitPrice = calcItem?.unitPrice ?? 0
+      if (!calcItem && volItem?.ahsId) {
+        const matchedAhs = ahsList.find(a => a.id === volItem.ahsId)
+        unitPrice = matchedAhs?.totalPrice ?? 0
+      }
+      return sum + (volume * unitPrice)
+    }, 0)
   }
 
-  const groups: WbsGroup[] = []
-
-  // Add groups under category
-  categories.forEach((cat, gIndex) => {
-    const childItems = wbsItems.filter(i => i.type === 'item' && i.parentId === cat.id)
-    // Sort child items by their logical sortOrder
-    childItems.sort((a, b) => a.sortOrder - b.sortOrder)
-    
-    const displayCode = String(gIndex + 1)
-    const childRows = childItems.map((wbs, rIndex) => {
-      const row = getRabRowForWbs(wbs)
-      return {
-        ...row,
-        code: `${displayCode}.${rIndex + 1}` // Dynamic, sequential sub-code
-      }
-    })
-
-    groups.push({
-      category: cat,
-      displayCode,
-      rows: childRows
-    })
-  })
-
-  // Add uncategorized items at the bottom
-  const uncategorizedItems = wbsItems.filter(i => i.type === 'item' && (i.parentId === null || i.parentId === undefined))
-  if (uncategorizedItems.length > 0) {
-    uncategorizedItems.sort((a, b) => a.sortOrder - b.sortOrder)
-    const uncategorizedRows = uncategorizedItems.map((wbs, rIndex) => {
-      const row = getRabRowForWbs(wbs)
-      return {
-        ...row,
-        code: String(rIndex + 1)
-      }
-    })
-    
-    groups.push({
-      category: null,
-      displayCode: '-',
-      rows: uncategorizedRows
-    })
-  }
-
-  const rows = groups.flatMap(g => g.rows)
+  const leafItems = wbsItems.filter(i => i.type === 'item')
+  const rows = leafItems.map(wbs => getRabRowForWbs(wbs))
 
   // ── ACTIONS ──
 
@@ -168,11 +182,29 @@ export function RabInputTab({ projectId }: RabInputTabProps): React.ReactElement
     await createItem({
       projectId,
       parentId: null,
-      name: 'Kategori Pekerjaan Baru',
+      name: 'Lantai / Bagian Baru',
       type: 'group',
       unit: '',
       sortOrder: nextSortOrder
     })
+  }
+
+  // Add sub-category under category
+  const handleAddSubCategory = async (parentId: string) => {
+    const siblings = wbsItems.filter(i => i.parentId === parentId && i.type === 'group')
+    const nextSortOrder = siblings.length > 0
+      ? Math.max(...siblings.map(s => s.sortOrder)) + 1
+      : 1
+
+    await createItem({
+      projectId,
+      parentId,
+      name: 'Sub-Kategori Baru',
+      type: 'group',
+      unit: '',
+      sortOrder: nextSortOrder
+    })
+    await loadWbs(projectId)
   }
 
   // Add sub-item under category
@@ -326,17 +358,7 @@ export function RabInputTab({ projectId }: RabInputTabProps): React.ReactElement
               onClick={handleAddCategory}
               className="btn-primary bg-slate-800 hover:bg-slate-900 flex items-center gap-1.5 text-xs px-4 py-2"
             >
-              + Kategori
-            </button>
-            <button 
-              onClick={() => {
-                // If there's a category, add under the first category. Otherwise, uncategorized.
-                const firstCatId = categories[0]?.id || ''
-                handleAddSubRow(firstCatId)
-              }}
-              className="btn-primary flex items-center gap-1.5 text-xs px-4 py-2"
-            >
-              + Pekerjaan
+              + Tambah Lantai / Bagian
             </button>
           </div>
         </div>
@@ -349,7 +371,7 @@ export function RabInputTab({ projectId }: RabInputTabProps): React.ReactElement
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="table-header w-16 text-center">No WBS</th>
                 <th className="table-header w-2/5">Uraian Kategori & Item Pekerjaan / Referensi AHS</th>
-                <th className="table-header w-28">Volume</th>
+                <th className="table-header w-36">Volume</th>
                 <th className="table-header w-20 text-center">Satuan</th>
                 <th className="table-header w-32 text-right">Harga Satuan</th>
                 <th className="table-header w-36 text-right">Jumlah Biaya</th>
@@ -357,223 +379,265 @@ export function RabInputTab({ projectId }: RabInputTabProps): React.ReactElement
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {groups.map((group, gIndex) => {
-                const cat = group.category
-                return (
-                  <React.Fragment key={cat ? cat.id : 'uncategorized'}>
-                    {/* Category Group Header Row */}
-                    <tr className="bg-slate-100/80 border-t border-b border-gray-200 font-sans">
+              {wbsItems.map((item) => {
+                const level = item.wbsPath ? item.wbsPath.split('.').length - 1 : 0
+                
+                if (item.type === 'group') {
+                  const subtotal = getGroupSubtotal(item.wbsPath)
+                  return (
+                    <tr 
+                      key={item.id} 
+                      className={`border-t border-b border-gray-200 font-sans transition-colors ${
+                        level === 0 
+                          ? 'bg-slate-200 text-slate-900 font-extrabold shadow-sm' 
+                          : 'bg-slate-100/80 text-slate-800 font-bold'
+                      }`}
+                    >
+                      {/* Code */}
                       <td className="px-4 py-2 font-mono text-sm font-extrabold text-slate-800 text-center">
-                        {cat ? group.displayCode : '-'}
+                        {item.code}
                       </td>
-                      <td className="px-4 py-2 font-bold text-slate-800" colSpan={4}>
-                        {cat ? (
-                          <div className="flex items-center justify-between w-full">
-                            <input
-                              type="text"
-                              value={localCategoryNames[cat.id] !== undefined ? localCategoryNames[cat.id] : cat.name}
-                              onChange={e => handleCategoryLocalChange(cat.id, e.target.value)}
-                              onBlur={() => handleCategorySubmit(cat.id, cat.name)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                  handleCategorySubmit(cat.id, cat.name)
-                                  ;(e.target as HTMLInputElement).blur()
-                                }
-                              }}
-                              className="bg-transparent border-b border-transparent hover:border-slate-400 focus:border-primary-500 focus:bg-white px-2 py-0.5 rounded font-extrabold text-slate-800 w-96 text-sm focus:outline-none transition-all"
-                            />
-                            <div className="flex gap-2 text-xs no-print font-normal">
+                      {/* Category Name & Actions */}
+                      <td className="px-4 py-2" colSpan={4}>
+                        <div className="flex items-center justify-between w-full" style={{ paddingLeft: `${level * 16}px` }}>
+                          <input
+                            type="text"
+                            value={localCategoryNames[item.id] !== undefined ? localCategoryNames[item.id] : item.name}
+                            onChange={e => handleCategoryLocalChange(item.id, e.target.value)}
+                            onBlur={() => handleCategorySubmit(item.id, item.name)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                handleCategorySubmit(item.id, item.name)
+                                ;(e.target as HTMLInputElement).blur()
+                              }
+                            }}
+                            className={`bg-transparent border-b border-transparent hover:border-slate-400 focus:border-primary-500 focus:bg-white px-2 py-0.5 rounded w-96 text-sm focus:outline-none transition-all ${
+                              level === 0 ? 'font-black tracking-wider uppercase text-slate-900' : 'font-bold text-slate-800'
+                            }`}
+                            placeholder={level === 0 ? "Nama Lantai / Bagian..." : "Nama Kategori Pekerjaan..."}
+                          />
+                          <div className="flex gap-2 text-xs no-print font-normal">
+                            {level === 0 ? (
                               <button
-                                onClick={() => handleAddSubRow(cat.id)}
+                                onClick={() => handleAddSubCategory(item.id)}
+                                className="text-slate-700 hover:text-slate-900 bg-white border border-slate-300 hover:bg-slate-50 px-2.5 py-1 rounded font-bold transition-all shadow-sm"
+                              >
+                                + Kategori Pekerjaan
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleAddSubRow(item.id)}
                                 className="text-primary-700 hover:text-primary-900 bg-white border border-primary-300 hover:bg-primary-50 px-2.5 py-1 rounded font-bold transition-all shadow-sm"
                               >
-                                + Sub-Pekerjaan
+                                + Pekerjaan / Analisa
                               </button>
-                              <button
-                                onClick={() => handleDeleteRow(cat.id)}
-                                className="text-red-600 hover:text-red-800 bg-white border border-red-200 hover:bg-red-50 px-2.5 py-1 rounded font-bold transition-all shadow-sm"
-                                title="Hapus seluruh kategori beserta sub-pekerjaannya"
-                              >
-                                Hapus Kategori
-                              </button>
-                            </div>
+                            )}
+                            <button
+                              onClick={() => handleDeleteRow(item.id)}
+                              className="text-red-600 hover:text-red-800 bg-white border border-red-200 hover:bg-red-50 px-2.5 py-1 rounded font-bold transition-all shadow-sm"
+                              title="Hapus kategori dan sub-pekerjaannya"
+                            >
+                              Hapus
+                            </button>
                           </div>
-                        ) : (
-                          <span className="text-gray-500 italic uppercase tracking-wider text-xs">Tanpa Kategori</span>
-                        )}
+                        </div>
                       </td>
+                      {/* Subtotal */}
                       <td className="px-4 py-2 text-right font-mono font-extrabold text-slate-800 text-sm">
-                        {formatCurrency(group.rows.reduce((sum, r) => sum + r.totalPrice, 0))}
+                        {formatCurrency(subtotal)}
                       </td>
                       <td className="px-4 py-2 text-center text-gray-400">-</td>
                     </tr>
+                  )
+                } else {
+                  const row = getRabRowForWbs(item)
+                  const isSearching = activeSearchId === item.id
+                  const displayVol = localVolumes[item.id] !== undefined 
+                    ? localVolumes[item.id] 
+                    : String(row.volume || '0')
+                  const volItem = volumes.find(v => v.wbsItemId === item.id)
+                  const hasCalculatorBackup = volItem?.formula && volItem.formula.trim().startsWith('{')
 
-                    {/* Sub-Pekerjaan Rows under this category */}
-                    {group.rows.map((row, index) => {
-                      const isSearching = activeSearchId === row.wbsItemId
-                      const displayVol = localVolumes[row.wbsItemId] !== undefined 
-                        ? localVolumes[row.wbsItemId] 
-                        : String(row.volume || '0')
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                      {/* Code */}
+                      <td className="table-cell text-center text-gray-500 font-mono text-xs">
+                        {item.code}
+                      </td>
 
-                      return (
-                        <tr key={row.wbsItemId} className="hover:bg-gray-50/50 transition-colors">
-                          {/* Code */}
-                          <td className="table-cell text-center text-gray-500 font-mono text-xs">
-                            {row.code}
-                          </td>
+                      {/* Work Item Name & Parent Group Selector */}
+                      <td className="table-cell overflow-visible">
+                        <div className="flex flex-col gap-1.5 text-left relative" style={{ paddingLeft: `${level * 16}px` }}>
+                          <input
+                            type="text"
+                            value={localRowNames[item.id] !== undefined ? localRowNames[item.id] : item.name}
+                            onChange={e => handleRowNameLocalChange(item.id, e.target.value)}
+                            onBlur={() => handleRowNameSubmit(item.id, item.name)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                handleRowNameSubmit(item.id, item.name)
+                                ;(e.target as HTMLInputElement).blur()
+                              }
+                            }}
+                            className="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-primary-500 focus:bg-white px-1.5 py-0.5 rounded text-gray-800 font-semibold w-full focus:outline-none transition-all text-sm"
+                          />
 
-                          {/* Work Item Name & Parent Group Selector */}
-                          <td className="table-cell overflow-visible">
-                            <div className="flex flex-col gap-1.5 text-left relative">
+                          <div className="flex items-center gap-2 mt-0.5 no-print">
+                            {/* Category Dropdown */}
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-gray-400 uppercase tracking-wider">Kelompok:</span>
+                              <select
+                                value={item.parentId || ''}
+                                onChange={async (e) => {
+                                  const newParentId = e.target.value || null
+                                  await moveItem(item.id, newParentId, 1)
+                                  calculate(projectId, ppn, overhead)
+                                }}
+                                className="bg-gray-50 border border-gray-200 rounded px-1 py-0.5 text-[10px] text-gray-600 focus:outline-none"
+                              >
+                                <option value="">-- Tanpa Kategori --</option>
+                                {categories.map(c => (
+                                  <option key={c.id} value={c.id}>{c.code}. {c.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* AHS Reference */}
+                            {row.ahsId ? (
+                              <div className="flex items-center gap-1 border-l border-gray-200 pl-2">
+                                <span className="text-[10px] text-gray-400 uppercase tracking-wider">AHS:</span>
+                                <span 
+                                  onClick={() => {
+                                    setActiveSearchId(item.id)
+                                    setSearchQuery(row.ahsCode)
+                                  }}
+                                  className="font-mono text-[10px] bg-primary-50 text-primary-700 px-1 py-0.5 rounded cursor-pointer hover:bg-primary-100 transition-colors"
+                                  title="Klik untuk mengganti referensi AHS"
+                                >
+                                  {row.ahsCode} - {row.ahsName}
+                                </span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setActiveSearchId(item.id)
+                                  setSearchQuery('')
+                                }}
+                                className="text-[10px] text-red-500 hover:text-red-700 font-bold underline transition-colors"
+                              >
+                                Pilih Referensi AHS...
+                              </button>
+                            )}
+
+                            {/* Backup volume summary indicator */}
+                            {volItem?.notes && hasCalculatorBackup && (
+                              <div className="text-[10px] text-amber-600 bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 truncate max-w-xs font-sans" title={volItem.notes}>
+                                📝 {volItem.notes}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* AHS Search Dropdown */}
+                          {isSearching && (
+                            <div ref={dropdownRef} className="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl z-50">
                               <input
                                 type="text"
-                                value={localRowNames[row.wbsItemId] !== undefined ? localRowNames[row.wbsItemId] : row.name}
-                                onChange={e => handleRowNameLocalChange(row.wbsItemId, e.target.value)}
-                                onBlur={() => handleRowNameSubmit(row.wbsItemId, row.name)}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') {
-                                    handleRowNameSubmit(row.wbsItemId, row.name)
-                                    ;(e.target as HTMLInputElement).blur()
-                                  }
-                                }}
-                                className="bg-transparent border-b border-transparent hover:border-gray-300 focus:border-primary-500 focus:bg-white px-1.5 py-0.5 rounded text-gray-800 font-semibold w-full focus:outline-none transition-all text-sm"
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                placeholder="Cari Kode/Nama AHS..."
+                                className="w-full px-3 py-1.5 border-b border-gray-200 text-xs outline-none focus:bg-gray-50 font-sans"
+                                autoFocus
                               />
-
-                              <div className="flex items-center gap-2 mt-0.5 no-print">
-                                {/* Category Dropdown */}
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[10px] text-gray-400 uppercase tracking-wider">Kelompok:</span>
-                                  <select
-                                    value={row.parentId || ''}
-                                    onChange={async (e) => {
-                                      const newParentId = e.target.value || null
-                                      await moveItem(row.wbsItemId, newParentId, 1)
-                                      calculate(projectId, ppn, overhead)
-                                    }}
-                                    className="bg-gray-50 border border-gray-200 rounded px-1 py-0.5 text-[10px] text-gray-600 focus:outline-none"
-                                  >
-                                    <option value="">-- Tanpa Kategori --</option>
-                                    {categories.map(c => (
-                                      <option key={c.id} value={c.id}>{c.code}. {c.name}</option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                {/* AHS Reference text/link */}
-                                {row.ahsId ? (
-                                  <div className="flex items-center gap-1 border-l border-gray-200 pl-2">
-                                    <span className="text-[10px] text-gray-400 uppercase tracking-wider">AHS:</span>
-                                    <span 
-                                      onClick={() => {
-                                        setActiveSearchId(row.wbsItemId)
-                                        setSearchQuery(row.ahsCode)
-                                      }}
-                                      className="font-mono text-[10px] bg-primary-50 text-primary-700 px-1 py-0.5 rounded cursor-pointer hover:bg-primary-100 transition-colors"
-                                      title="Klik untuk mengganti referensi AHS"
-                                    >
-                                      {row.ahsCode} - {row.ahsName}
-                                    </span>
-                                  </div>
+                              <div className="divide-y divide-gray-50">
+                                {filteredAhs.length === 0 ? (
+                                  <div className="p-3 text-[11px] text-gray-500 text-center">Tidak ditemukan referensi AHS yang cocok.</div>
                                 ) : (
-                                  <button
-                                    onClick={() => {
-                                      setActiveSearchId(row.wbsItemId)
-                                      setSearchQuery('')
-                                    }}
-                                    className="text-[10px] text-red-500 hover:text-red-700 font-bold underline transition-colors"
-                                  >
-                                    Pilih Referensi AHS...
-                                  </button>
+                                  filteredAhs.map(ahs => (
+                                    <div
+                                      key={ahs.id}
+                                      onClick={() => handleSelectAhs(item.id, ahs)}
+                                      className="p-2 hover:bg-primary-50 cursor-pointer text-[11px] flex flex-col gap-0.5 text-left"
+                                    >
+                                      <span className="font-mono font-bold text-primary-700">{ahs.code} ({ahs.unit})</span>
+                                      <span className="text-gray-700 font-medium">{ahs.name}</span>
+                                      <span className="text-gray-400 font-mono">Harga: {formatCurrency(ahs.totalPrice)}</span>
+                                    </div>
+                                  ))
                                 )}
                               </div>
-
-                              {/* AHS Search Dropdown Autocomplete Overlay */}
-                              {isSearching && (
-                                <div ref={dropdownRef} className="absolute left-0 right-0 top-full mt-1 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-xl z-50">
-                                  <input
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)}
-                                    placeholder="Cari Kode/Nama AHS..."
-                                    className="w-full px-3 py-1.5 border-b border-gray-200 text-xs outline-none focus:bg-gray-50 font-sans"
-                                    autoFocus
-                                  />
-                                  <div className="divide-y divide-gray-50">
-                                    {filteredAhs.length === 0 ? (
-                                      <div className="p-3 text-[11px] text-gray-500 text-center">Tidak ditemukan referensi AHS yang cocok.</div>
-                                    ) : (
-                                      filteredAhs.map(ahs => (
-                                        <div
-                                          key={ahs.id}
-                                          onClick={() => handleSelectAhs(row.wbsItemId, ahs)}
-                                          className="p-2 hover:bg-primary-50 cursor-pointer text-[11px] flex flex-col gap-0.5 text-left"
-                                        >
-                                          <span className="font-mono font-bold text-primary-700">{ahs.code} ({ahs.unit})</span>
-                                          <span className="text-gray-700 font-medium">{ahs.name}</span>
-                                          <span className="text-gray-400 font-mono">Harga: {formatCurrency(ahs.totalPrice)}</span>
-                                        </div>
-                                      ))
-                                    )}
-                                  </div>
-                                </div>
-                              )}
                             </div>
-                          </td>
+                          )}
+                        </div>
+                      </td>
 
-                          {/* Volume */}
-                          <td className="table-cell">
-                            <input
-                              type="number"
-                              step="0.001"
-                              min="0"
-                              value={displayVol}
-                              onChange={e => handleVolumeLocalChange(row.wbsItemId, e.target.value)}
-                              onBlur={() => handleVolumeSubmit(row.wbsItemId, row.volume)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                  handleVolumeSubmit(row.wbsItemId, row.volume)
-                                  ;(e.target as HTMLInputElement).blur()
-                                }
-                              }}
-                              className="w-full px-2 py-1 border border-gray-300 rounded text-right font-mono text-sm focus:border-primary-500 focus:outline-none"
-                            />
-                          </td>
+                      {/* Volume */}
+                      <td className="table-cell">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            step="0.001"
+                            min="0"
+                            value={displayVol}
+                            onChange={e => handleVolumeLocalChange(item.id, e.target.value)}
+                            onBlur={() => handleVolumeSubmit(item.id, row.volume)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                handleVolumeSubmit(item.id, row.volume)
+                                ;(e.target as HTMLInputElement).blur()
+                              }
+                            }}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-right font-mono text-sm focus:border-primary-500 focus:outline-none"
+                          />
+                          <button
+                            onClick={() => {
+                              setSelectedVolItem(row)
+                              setCalculatorOpen(true)
+                            }}
+                            className={`p-1.5 border rounded hover:bg-slate-100 text-xs shadow-sm flex items-center justify-center transition-colors flex-shrink-0 ${
+                              hasCalculatorBackup 
+                                ? 'bg-amber-100 border-amber-300 text-amber-700 font-bold' 
+                                : 'bg-white border-gray-300 text-gray-500'
+                            }`}
+                            title="Buka kalkulator detail volume (Backup)"
+                          >
+                            🧮
+                          </button>
+                        </div>
+                      </td>
 
-                          {/* Unit */}
-                          <td className="table-cell text-center text-gray-600 text-sm font-semibold">
-                            {row.unit || '-'}
-                          </td>
+                      {/* Unit */}
+                      <td className="table-cell text-center text-gray-600 text-sm font-semibold">
+                        {row.unit || '-'}
+                      </td>
 
-                          {/* Unit Price */}
-                          <td className="table-cell text-right font-mono text-sm text-gray-600">
-                            {formatCurrency(row.unitPrice)}
-                          </td>
+                      {/* Unit Price */}
+                      <td className="table-cell text-right font-mono text-sm text-gray-600">
+                        {formatCurrency(row.unitPrice)}
+                      </td>
 
-                          {/* Total Price */}
-                          <td className="table-cell text-right font-mono text-sm font-bold text-gray-900">
-                            {formatCurrency(row.totalPrice)}
-                          </td>
+                      {/* Total Price */}
+                      <td className="table-cell text-right font-mono text-sm font-bold text-gray-900">
+                        {formatCurrency(row.totalPrice)}
+                      </td>
 
-                          {/* Actions */}
-                          <td className="table-cell text-center">
-                            <button
-                              onClick={() => handleDeleteRow(row.wbsItemId)}
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors"
-                              title="Hapus pekerjaan ini"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </React.Fragment>
-                )
+                      {/* Actions */}
+                      <td className="table-cell text-center">
+                        <button
+                          onClick={() => handleDeleteRow(item.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors"
+                          title="Hapus pekerjaan ini"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                }
               })}
 
-              {rows.length === 0 && categories.length === 0 && (
+              {wbsItems.length === 0 && (
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-gray-400 text-sm italic">
                     Belum ada item pekerjaan atau kategori di proyek ini. Klik "+ Kategori" atau "+ Pekerjaan" untuk memulai.
@@ -609,6 +673,18 @@ export function RabInputTab({ projectId }: RabInputTabProps): React.ReactElement
           </div>
         )}
       </div>
+
+      {/* Volume Calculator Modal overlay */}
+      <VolumeCalculatorModal
+        isOpen={calculatorOpen}
+        onClose={() => setCalculatorOpen(false)}
+        onApply={handleApplyCalculator}
+        initialFormula={selectedVolItem ? (volumes.find(v => v.wbsItemId === selectedVolItem.wbsItemId)?.formula || '') : ''}
+        initialNotes={selectedVolItem ? (volumes.find(v => v.wbsItemId === selectedVolItem.wbsItemId)?.notes || '') : ''}
+        unit={selectedVolItem?.unit || ''}
+        projectId={projectId}
+        initialProjectVolumeId={selectedVolItem ? (volumes.find(v => v.wbsItemId === selectedVolItem.wbsItemId)?.projectVolumeId || null) : null}
+      />
     </div>
   )
 }

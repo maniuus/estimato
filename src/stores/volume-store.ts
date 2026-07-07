@@ -12,7 +12,7 @@ interface VolumeState {
 interface VolumeActions {
   loadByProject: (projectId: string) => Promise<void>
   upsert: (wbsItemId: string, data: Partial<Omit<VolumeItem, 'id' | 'createdAt' | 'updatedAt' | 'wbsItemId'>>) => Promise<boolean>
-  bulkUpsert: (items: Array<{ wbsItemId: string; volume?: number; unit?: string; ahsId?: string | null }>) => Promise<boolean>
+  bulkUpsert: (items: Array<{ wbsItemId: string; volume?: number; unit?: string; ahsId?: string | null; projectVolumeId?: string | null; formula?: string; notes?: string }>) => Promise<boolean>
 }
 
 export type VolumeStore = VolumeState & VolumeActions

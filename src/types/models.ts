@@ -117,8 +117,21 @@ export interface VolumeItem {
   unit: string
   formula: string
   notes: string
+  projectVolumeId: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface ProjectVolume {
+  id: string
+  projectId: string
+  name: string
+  unit: string
+  value: number
+  formula: string
+  notes: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface RabSnapshot {

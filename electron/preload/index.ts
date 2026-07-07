@@ -91,6 +91,12 @@ const api = {
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.VOLUME_DELETE, id)
   },
 
+  projectVolume: {
+    getByProject: (projectId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_VOLUME_GET_BY_PROJECT, projectId),
+    upsert: (projectId: string, data: unknown) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_VOLUME_UPSERT, projectId, data),
+    delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_VOLUME_DELETE, id)
+  },
+
   rab: {
     calculate: (projectId: string, ppn: number, overhead: number) => ipcRenderer.invoke(IPC_CHANNELS.RAB_CALCULATE, projectId, ppn, overhead),
     saveSnapshot: (projectId: string, ppn: number, overhead: number) => ipcRenderer.invoke(IPC_CHANNELS.RAB_SAVE_SNAPSHOT, projectId, ppn, overhead),

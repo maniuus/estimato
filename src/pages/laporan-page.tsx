@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRabStore, type RabLineItem } from '../stores/rab-store'
 import { useVolumeStore } from '../stores/volume-store'
+import { useProjectVolumeStore } from '../stores/project-volume-store'
 import { useAhsStore } from '../stores/ahs-store'
 import { useProjectStore } from '../stores/project-store'
 import { useWbsStore } from '../stores/wbs-store'
@@ -81,6 +82,184 @@ function getTerbilang(amount: number): string {
   return hasil + " Rupiah";
 }
 
+export function parseFormulaToText(formulaJson: string): string {
+  if (!formulaJson) return ''
+  try {
+    const parsed = JSON.parse(formulaJson)
+    if (!parsed || !parsed.type) return String(formulaJson)
+    
+    if (parsed.type === 'simple') {
+      return String(parsed.data || '')
+    }
+    
+    if (parsed.type === 'dimensions' && Array.isArray(parsed.data)) {
+      return parsed.data.map((row: any, i: number) => {
+        return `[Brs ${i + 1}] P: ${row.p}m x L: ${row.l}m x T: ${row.t}m x Qty: ${row.qty} = ${row.subtotal}`
+      }).join('\n')
+    }
+    
+    if ((parsed.type === 'steel' || parsed.type === 'rebar') && parsed.data) {
+      const d = parsed.data
+      if (d.steelMode === 'section') {
+        const parseDiameter = (val: string): { size: number, type: 'polos' | 'ulir' } => {
+          if (!val) return { size: 0, type: 'polos' }
+          const size = parseFloat(val.replace(/[^\d.]/g, '')) || 0
+          const type = val.includes('Ø') ? 'polos' : 'ulir'
+          return { size, type }
+        }
+
+        const elements = d.sectionElements || []
+        
+        if (elements.length === 0 && d.sectionB) {
+          // Fallback for old single section format
+          const b = parseFloat(d.sectionB) || 200
+          const h = parseFloat(d.sectionH) || 300
+          const c = parseFloat(d.sectionCover) || 40
+          const len = parseFloat(d.elementLength) || 0
+          const eqty = parseFloat(d.elementQty) || 1
+          
+          let mainWeight = 0
+          const mainDetails: string[] = []
+          if (d.mainRebarRows && d.mainRebarRows.length > 0) {
+            d.mainRebarRows.forEach((r: any) => {
+              const { size } = parseDiameter(r.diameter)
+              const qty = parseFloat(r.qty) || 0
+              mainWeight += qty * len * (0.006165 * size * size) * eqty
+              mainDetails.push(`${r.position}: ${qty}x ${r.diameter}`)
+            })
+          } else {
+            const { size: dMain } = parseDiameter(d.mainDia)
+            const qTop = parseFloat(d.mainQtyTop) || 0
+            const qBottom = parseFloat(d.mainQtyBottom) || 0
+            const mainUnitWeight = 0.006165 * dMain * dMain
+            mainWeight = (qTop + qBottom) * len * mainUnitWeight * eqty
+            mainDetails.push(`Atas ${qTop} + Bawah ${qBottom} (${d.mainDia})`)
+          }
+
+          const { size: dStirrup } = parseDiameter(d.stirrupDia)
+          const stirrupLengthMm = (b > 2 * c && h > 2 * c) 
+            ? 2 * (b - 2 * c) + 2 * (h - 2 * c) + 12 * dStirrup
+            : 0
+          const stirrupLengthM = stirrupLengthMm / 1000
+          
+          let stirrupCount = 0
+          let spacingStr = ''
+          if (d.stirrupMode === 'split') {
+            const sTumpuan = parseFloat(d.stirrupSpacingTumpuan) || 100
+            const sLapangan = parseFloat(d.stirrupSpacingLapangan) || 150
+            const countTumpuan = Math.floor(((len / 2) * 1000) / sTumpuan)
+            const countLapangan = Math.floor(((len / 2) * 1000) / sLapangan)
+            stirrupCount = countTumpuan + countLapangan + 1
+            spacingStr = `Tumpuan @${sTumpuan}mm, Lapangan @${sLapangan}mm`
+          } else {
+            const sVal = parseFloat(d.stirrupSpacing) || 150
+            stirrupCount = sVal > 0 ? Math.floor((len * 1000) / sVal) + 1 : 0
+            spacingStr = `@${sVal}mm`
+          }
+          
+          const stirrupUnitWeight = 0.006165 * dStirrup * dStirrup
+          const stirrupWeight = stirrupCount * stirrupLengthM * stirrupUnitWeight * eqty
+          const totalWeight = mainWeight + stirrupWeight
+
+          return `Penampang ${d.sectionName || 'B1'} ${b}x${h}mm, L: ${len}m (${eqty}x)\nSelimut: ${c}mm\nUtama: [${mainDetails.join(', ')}] = ${mainWeight.toFixed(3)} kg\nBegel: ${d.stirrupDia} ${spacingStr} (${stirrupCount}x, L:${stirrupLengthM.toFixed(3)}m) = ${stirrupWeight.toFixed(3)} kg\nTotal: ${totalWeight.toFixed(3)} kg`
+        }
+
+        return elements.map((el: any, idx: number) => {
+          const b = parseFloat(el.b) || 200
+          const h = parseFloat(el.h) || 300
+          const c = parseFloat(el.c) || 40
+          const len = parseFloat(el.length) || 0
+          const eqty = parseFloat(el.qty) || 1
+          
+          let mainWeight = 0
+          const mainDetails: string[] = []
+          ;(el.mainRebarRows || []).forEach((r: any) => {
+            const { size } = parseDiameter(r.diameter)
+            const qty = parseFloat(r.qty) || 0
+            mainWeight += qty * len * (0.006165 * size * size) * eqty
+            mainDetails.push(`${r.position}: ${qty}x ${r.diameter}`)
+          })
+
+          const { size: dStirrup } = parseDiameter(el.stirrupDia)
+          const stirrupLengthMm = (b > 2 * c && h > 2 * c) 
+            ? 2 * (b - 2 * c) + 2 * (h - 2 * c) + 12 * dStirrup
+            : 0
+          const stirrupLengthM = stirrupLengthMm / 1000
+          
+          let stirrupCount = 0
+          let spacingStr = ''
+          if (el.stirrupMode === 'split') {
+            const sTumpuan = parseFloat(el.stirrupSpacingTumpuan) || 100
+            const sLapangan = parseFloat(el.stirrupSpacingLapangan) || 150
+            const countTumpuan = Math.floor(((len / 2) * 1000) / sTumpuan)
+            const countLapangan = Math.floor(((len / 2) * 1000) / sLapangan)
+            stirrupCount = countTumpuan + countLapangan + 1
+            spacingStr = `Tumpuan @${sTumpuan}mm, Lapangan @${sLapangan}mm`
+          } else {
+            const sVal = parseFloat(el.stirrupSpacing) || 150
+            stirrupCount = sVal > 0 ? Math.floor((len * 1000) / sVal) + 1 : 0
+            spacingStr = `@${sVal}mm`
+          }
+          
+          const stirrupUnitWeight = 0.006165 * dStirrup * dStirrup
+          const stirrupWeight = stirrupCount * stirrupLengthM * stirrupUnitWeight * eqty
+          const totalWeight = mainWeight + stirrupWeight
+
+          return `[Elemen ${idx + 1}] ${el.name} (${b}x${h}mm, L: ${len}m, ${eqty}x)\n  Selimut: ${c}mm\n  Utama: [${mainDetails.join(', ')}] = ${mainWeight.toFixed(3)} kg\n  Begel: ${el.stirrupDia} ${spacingStr} (${stirrupCount}x, L:${stirrupLengthM.toFixed(3)}m) = ${stirrupWeight.toFixed(3)} kg\n  Total: ${totalWeight.toFixed(3)} kg`
+        }).join('\n\n')
+      } else {
+        const rows = d.rows || []
+        return rows.map((row: any, i: number) => {
+          const sizeStr = String(row.diameter || '')
+          const size = parseFloat(sizeStr.replace(/[^\d.]/g, '')) || 0
+          const unitWeight = 0.006165 * size * size
+          const len = parseFloat(row.length) || 0
+          const qty = parseFloat(row.qty) || 0
+          const mult = parseFloat(row.mult) || 1
+          const subtotal = unitWeight * len * qty * mult
+          const desc = row.description ? `${row.description}: ` : ''
+          return `[Brs ${i + 1}] ${desc}${sizeStr} x L: ${row.length}m x Qty: ${row.qty} x Mult: ${row.mult} = ${subtotal.toFixed(3)} kg`
+        }).join('\n')
+      }
+    }
+    
+    if (parsed.type === 'wall' && parsed.data) {
+      const d = parsed.data
+      if (!d.wallRows && d.wallLength) {
+        // Fallback for old single wall format
+        const grossArea = (parseFloat(d.wallLength)||0) * (parseFloat(d.wallHeight)||0) * (parseFloat(d.wallMult)||1)
+        const openingsStr = (d.openings || []).map((op: any) => {
+          const area = (parseFloat(op.width)||0) * (parseFloat(op.height)||0) * (parseFloat(op.qty)||0)
+          return `${op.name || 'Bukaan'} (Qty: ${op.qty}, ${op.width}m x ${op.height}m = -${area.toFixed(3)})`
+        }).join(', ')
+        const totalOpenings = (d.openings || []).reduce((sum: number, op: any) => sum + (parseFloat(op.width)||0) * (parseFloat(op.height)||0) * (parseFloat(op.qty)||0), 0)
+        const netArea = grossArea - totalOpenings
+        return `Gross Area: ${d.wallLength}m x ${d.wallHeight}m x ${d.wallMult} = ${grossArea.toFixed(3)} m2\nBukaan: [${openingsStr || 'tidak ada'}]\nNet Area: ${netArea.toFixed(3)} m2`
+      }
+
+      const wallsStr = (d.wallRows || []).map((w: any, i: number) => {
+        const area = (parseFloat(w.length)||0) * (parseFloat(w.height)||0) * (parseFloat(w.qty)||0)
+        return `[Dind ${i + 1}] P: ${w.length}m x T: ${w.height}m x Qty: ${w.qty} = ${area.toFixed(3)} m2`
+      }).join('\n')
+      
+      const openingsStr = (d.openings || []).map((op: any) => {
+        const area = (parseFloat(op.width)||0) * (parseFloat(op.height)||0) * (parseFloat(op.qty)||0)
+        return `${op.name || 'Bukaan'} (Qty: ${op.qty}, ${op.width}m x ${op.height}m = -${area.toFixed(3)})`
+      }).join(', ')
+      
+      const totalGross = (d.wallRows || []).reduce((sum: number, w: any) => sum + (parseFloat(w.length)||0) * (parseFloat(w.height)||0) * (parseFloat(w.qty)||0), 0)
+      const totalOpenings = (d.openings || []).reduce((sum: number, op: any) => sum + (parseFloat(op.width)||0) * (parseFloat(op.height)||0) * (parseFloat(op.qty)||0), 0)
+      const netArea = totalGross - totalOpenings
+
+      return `Gross Area:\n${wallsStr}\nBukaan: [${openingsStr || 'tidak ada'}]\nNet Area: ${netArea.toFixed(3)} m2`
+    }
+    
+    return String(formulaJson)
+  } catch (e) {
+    return String(formulaJson)
+  }
+}
+
 export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement {
   const { calculation, calculate, latestSnapshot, loadLatest } = useRabStore()
   const { items: volumes, loadByProject: loadVolumes } = useVolumeStore()
@@ -92,16 +271,19 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
   const ppn = project?.ppn ?? 11
   const overhead = project?.overhead ?? 0
 
-  const [previewTab, setPreviewTab] = useState<'rekap' | 'rab' | 'analisa' | 'bom'>('rekap')
+  const [previewTab, setPreviewTab] = useState<'rekap' | 'rab' | 'analisa' | 'bom' | 'backup'>('rekap')
   const [detailedAhsList, setDetailedAhsList] = useState<DetailedAhsData[]>([])
   const [bomItems, setBomItems] = useState<BomItem[]>([])
   const [loadingDetails, setLoadingDetails] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
 
+  const { items: projectVolumes, loadByProject: loadProjectVolumes } = useProjectVolumeStore()
+
   useEffect(() => {
     loadVolumes(projectId)
     loadWbs(projectId)
+    loadProjectVolumes(projectId)
     loadLibrary()
     loadLatest(projectId)
   }, [projectId])
@@ -248,68 +430,62 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
     }
   }, [volumes, ahsList, overhead])
 
-  // Build sequential report groups
-  const categories = wbsItems.filter(i => i.type === 'group')
-  categories.sort((a, b) => a.sortOrder - b.sortOrder)
-
-  interface ReportGroup {
-    category: WbsItem | null
-    displayCode: string
-    lineItems: RabLineItem[]
-  }
-
-  const reportGroups: ReportGroup[] = []
-
-  categories.forEach((cat, gIndex) => {
-    const displayCode = String(gIndex + 1)
-    const childWbs = wbsItems.filter(i => i.type === 'item' && i.parentId === cat.id)
-    childWbs.sort((a, b) => a.sortOrder - b.sortOrder)
-
-    const childLineItems: RabLineItem[] = []
-    childWbs.forEach((wbs, rIndex) => {
-      const calcItem = calculation?.lineItems?.find(li => li.wbsItemId === wbs.id)
-      if (calcItem) {
-        childLineItems.push({
-          ...calcItem,
-          wbsCode: `${displayCode}.${rIndex + 1}`
-        })
+  // Recursive subtotal calculation
+  const getGroupSubtotal = (groupWbsPath: string) => {
+    const leaves = wbsItems.filter(i => 
+      i.type === 'item' && 
+      (i.wbsPath === groupWbsPath || i.wbsPath.startsWith(groupWbsPath + '.'))
+    )
+    
+    return leaves.reduce((sum, leaf) => {
+      const volItem = volumes.find(v => v.wbsItemId === leaf.id)
+      const volume = volItem?.volume ?? 0
+      const calcItem = calculation?.lineItems?.find(li => li.wbsItemId === leaf.id)
+      let unitPrice = calcItem?.unitPrice ?? 0
+      if (!calcItem && volItem?.ahsId) {
+        const matchedAhs = ahsList.find(a => a.id === volItem.ahsId)
+        unitPrice = matchedAhs?.totalPrice ?? 0
       }
-    })
-
-    if (childLineItems.length > 0) {
-      reportGroups.push({
-        category: cat,
-        displayCode,
-        lineItems: childLineItems
-      })
-    }
-  })
-
-  const uncatWbs = wbsItems.filter(i => i.type === 'item' && (i.parentId === null || i.parentId === undefined))
-  uncatWbs.sort((a, b) => a.sortOrder - b.sortOrder)
-
-  const uncatLineItems: RabLineItem[] = []
-  uncatWbs.forEach((wbs, rIndex) => {
-    const calcItem = calculation?.lineItems?.find(li => li.wbsItemId === wbs.id)
-    if (calcItem) {
-      uncatLineItems.push({
-        ...calcItem,
-        wbsCode: String(rIndex + 1)
-      })
-    }
-  })
-
-  if (uncatLineItems.length > 0) {
-    reportGroups.push({
-      category: null,
-      displayCode: '-',
-      lineItems: uncatLineItems
-    })
+      return sum + (volume * unitPrice)
+    }, 0)
   }
+
+  // Rekapitulasi categories (roots only)
+  const rekapCategories = wbsItems.filter(i => i.type === 'group' && !i.parentId)
+  rekapCategories.sort((a, b) => a.sortOrder - b.sortOrder)
 
   const handleExportExcel = async () => {
     if (!project || !calculation) return
     setExporting(true)
+
+    const exportLineItems = wbsItems.map(item => {
+      const isGroup = item.type === 'group'
+      const subtotal = isGroup ? getGroupSubtotal(item.wbsPath) : 0
+      const volItem = !isGroup ? volumes.find(v => v.wbsItemId === item.id) : null
+      const volume = volItem?.volume ?? 0
+      const unit = volItem?.unit || item.unit
+      
+      const calcItem = !isGroup ? calculation?.lineItems?.find(li => li.wbsItemId === item.id) : null
+      let unitPrice = calcItem?.unitPrice ?? 0
+      if (!isGroup && !calcItem && volItem?.ahsId) {
+        const matchedAhs = ahsList.find(a => a.id === volItem.ahsId)
+        unitPrice = matchedAhs?.totalPrice ?? 0
+      }
+      const totalPrice = isGroup ? subtotal : (volume * unitPrice)
+
+      return {
+        id: item.id,
+        isGroup,
+        level: item.wbsPath ? item.wbsPath.split('.').length - 1 : 0,
+        wbsCode: item.code,
+        wbsName: item.name,
+        ahsCode: calcItem?.ahsCode ?? (volItem?.ahsId ? (ahsList.find(a => a.id === volItem.ahsId)?.code ?? '') : ''),
+        volume: isGroup ? 0 : volume,
+        unit: isGroup ? '' : (unit || ''),
+        unitPrice: isGroup ? 0 : unitPrice,
+        totalPrice
+      }
+    })
 
     const result = await window.api.rab.exportExcel({
       projectName: project.name,
@@ -317,7 +493,7 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
       year: project.year,
       ppn,
       overhead,
-      lineItems: reportGroups.flatMap(g => g.lineItems), // Exports WBS grouped line items with dynamic codes
+      lineItems: exportLineItems,
       detailedAhsList,
       bomItems
     })
@@ -442,6 +618,14 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
           >
             Preview Bill of Material
           </button>
+          <button 
+            onClick={() => setPreviewTab('backup')}
+            className={`px-4 py-2 border-b-2 text-sm font-semibold transition-all ${
+              previewTab === 'backup' ? 'border-primary-800 text-primary-800' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Preview Backup Volume
+          </button>
         </div>
 
         {/* Tab Previews */}
@@ -461,13 +645,12 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {reportGroups.map((group) => {
-                    const catName = group.category ? group.category.name : 'Tanpa Kategori'
-                    const catTotal = group.lineItems.reduce((sum, item) => sum + item.totalPrice, 0)
+                  {rekapCategories.map((cat, index) => {
+                    const catTotal = getGroupSubtotal(cat.wbsPath)
                     return (
-                      <tr key={group.category ? group.category.id : 'uncategorized'}>
-                        <td className="table-cell text-center font-mono text-xs">{group.category ? group.displayCode : '-'}</td>
-                        <td className="table-cell font-semibold text-gray-800 uppercase text-xs tracking-wide">{catName}</td>
+                      <tr key={cat.id}>
+                        <td className="table-cell text-center font-mono text-xs">{index + 1}</td>
+                        <td className="table-cell font-semibold text-gray-800 uppercase text-xs tracking-wide">{cat.name}</td>
                         <td className="table-cell text-right font-mono font-bold text-gray-900">{formatCurrency(catTotal)}</td>
                       </tr>
                     )
@@ -533,32 +716,47 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
                     <th className="table-header w-40 text-right">Jumlah Biaya</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {reportGroups.map((group) => (
-                    <React.Fragment key={group.category ? group.category.id : 'uncategorized'}>
-                      {/* Category row */}
-                      <tr className="bg-slate-100/60 font-bold text-slate-800 text-xs">
-                        <td className="px-4 py-2 font-mono text-center">{group.category ? group.displayCode : '-'}</td>
-                        <td colSpan={4} className="px-4 py-2 uppercase tracking-wider">
-                          {group.category ? group.category.name : 'Tanpa Kategori'}
-                        </td>
-                        <td className="px-4 py-2 text-right font-mono font-bold">
-                          {formatCurrency(group.lineItems.reduce((sum, item) => sum + item.totalPrice, 0))}
-                        </td>
-                      </tr>
-                      {/* Line item rows */}
-                      {group.lineItems.map((item) => (
-                        <tr key={item.wbsItemId}>
-                          <td className="table-cell text-center text-gray-400 font-mono text-xs">{item.wbsCode}</td>
-                          <td className="table-cell font-medium text-gray-800">{item.wbsName}</td>
-                          <td className="table-cell text-right font-mono">{item.volume}</td>
-                          <td className="table-cell text-center text-gray-600 font-semibold">{item.unit}</td>
-                          <td className="table-cell text-right font-mono text-gray-600">{formatCurrency(item.unitPrice)}</td>
-                          <td className="table-cell text-right font-mono font-bold text-gray-900">{formatCurrency(item.totalPrice)}</td>
+                 <tbody className="divide-y divide-gray-100">
+                  {wbsItems.map((item) => {
+                    const level = item.wbsPath ? item.wbsPath.split('.').length - 1 : 0
+                    
+                    if (item.type === 'group') {
+                      const subtotal = getGroupSubtotal(item.wbsPath)
+                      return (
+                        <tr key={item.id} className="bg-slate-100/60 font-bold text-slate-800 text-xs">
+                          <td className="px-4 py-2 font-mono text-center">{item.code}</td>
+                          <td colSpan={4} className="px-4 py-2 uppercase tracking-wider" style={{ paddingLeft: `${level * 16}px` }}>
+                            {item.name}
+                          </td>
+                          <td className="px-4 py-2 text-right font-mono font-bold">
+                            {formatCurrency(subtotal)}
+                          </td>
                         </tr>
-                      ))}
-                    </React.Fragment>
-                  ))}
+                      )
+                    } else {
+                      const calcItem = calculation?.lineItems?.find(li => li.wbsItemId === item.id)
+                      const volItem = volumes.find(v => v.wbsItemId === item.id)
+                      const volume = volItem?.volume ?? 0
+                      const unit = volItem?.unit || item.unit
+                      let unitPrice = calcItem?.unitPrice ?? 0
+                      if (!calcItem && volItem?.ahsId) {
+                        const matchedAhs = ahsList.find(a => a.id === volItem.ahsId)
+                        unitPrice = matchedAhs?.totalPrice ?? 0
+                      }
+                      const total = volume * unitPrice
+
+                      return (
+                        <tr key={item.id}>
+                          <td className="table-cell text-center text-gray-400 font-mono text-xs">{item.code}</td>
+                          <td className="table-cell font-medium text-gray-800" style={{ paddingLeft: `${level * 16}px` }}>{item.name}</td>
+                          <td className="table-cell text-right font-mono">{volume}</td>
+                          <td className="table-cell text-center text-gray-600 font-semibold">{unit || '-'}</td>
+                          <td className="table-cell text-right font-mono text-gray-600">{formatCurrency(unitPrice)}</td>
+                          <td className="table-cell text-right font-mono font-bold text-gray-900">{formatCurrency(total)}</td>
+                        </tr>
+                      )
+                    }
+                  })}
                 </tbody>
               </table>
               <div className="border-t border-gray-200 pt-4 space-y-4">
@@ -736,6 +934,78 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
               </div>
             </div>
           )}
+
+          {previewTab === 'backup' && (
+            <div className="space-y-4">
+              <div className="text-center border-b border-gray-100 pb-4">
+                <h2 className="text-xl font-bold text-gray-900 tracking-wide font-sans">DAFTAR BACKUP PERHITUNGAN VOLUME</h2>
+                <p className="text-sm text-gray-600 mt-1">{project?.name} &bull; {project?.location}</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="table-header w-20 text-center">No WBS</th>
+                      <th className="table-header text-left w-1/4">Uraian Pekerjaan</th>
+                      <th className="table-header w-24 text-right">Volume</th>
+                      <th className="table-header w-20 text-center">Satuan</th>
+                      <th className="table-header text-left">Rincian Perhitungan (Formula)</th>
+                      <th className="table-header text-left w-1/4">Catatan / Keterangan</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {wbsItems.map((item) => {
+                      const level = item.wbsPath ? item.wbsPath.split('.').length - 1 : 0
+                      
+                      if (item.type === 'group') {
+                        return (
+                          <tr key={item.id} className="bg-slate-50/80 font-bold text-slate-800 text-xs">
+                            <td className="px-4 py-2 font-mono text-center">{item.code}</td>
+                            <td colSpan={5} className="px-4 py-2 uppercase tracking-wide" style={{ paddingLeft: `${level * 16}px` }}>
+                              {item.name}
+                            </td>
+                          </tr>
+                        )
+                      }
+
+                      const volItem = volumes.find(v => v.wbsItemId === item.id)
+                      const linkedVol = volItem?.projectVolumeId 
+                        ? projectVolumes.find(pv => pv.id === volItem.projectVolumeId) 
+                        : null
+
+                      const volume = linkedVol ? linkedVol.value : (volItem?.volume ?? 0)
+                      const unit = linkedVol ? linkedVol.unit : (volItem?.unit || item.unit)
+                      
+                      const formulaSrc = linkedVol ? linkedVol.formula : (volItem?.formula || '')
+                      const notesText = linkedVol ? linkedVol.notes : (volItem?.notes || '-')
+                      
+                      const hasBackup = formulaSrc && formulaSrc.trim().startsWith('{')
+                      const formulaText = hasBackup ? parseFormulaToText(formulaSrc) : (linkedVol ? `Dihubungkan ke Volume: ${linkedVol.name}` : 'Manual Input')
+
+                      return (
+                        <tr key={item.id} className="hover:bg-gray-50/50">
+                          <td className="table-cell text-center text-gray-400 font-mono text-xs">{item.code}</td>
+                          <td className="table-cell font-medium text-gray-800" style={{ paddingLeft: `${level * 16}px` }}>{item.name}</td>
+                          <td className="table-cell text-right font-mono font-semibold">{volume}</td>
+                          <td className="table-cell text-center text-gray-600 font-semibold">{unit || '-'}</td>
+                          <td className="table-cell font-mono text-xs text-gray-700 whitespace-pre-line leading-relaxed">
+                            {hasBackup ? (
+                              <span className="text-amber-700 bg-amber-50/50 border border-amber-100 rounded px-1.5 py-0.5 inline-block font-sans mt-0.5">
+                                {formulaText}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 italic font-sans">{formulaText}</span>
+                            )}
+                          </td>
+                          <td className="table-cell text-gray-600 text-xs whitespace-pre-line">{notesText}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -758,18 +1028,17 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
               </tr>
             </thead>
             <tbody>
-              {reportGroups.map((group) => {
-                const catName = group.category ? group.category.name : 'Tanpa Kategori'
-                const catTotal = group.lineItems.reduce((sum, item) => sum + item.totalPrice, 0)
+              {rekapCategories.map((cat, index) => {
+                const catTotal = getGroupSubtotal(cat.wbsPath)
                 return (
-                  <tr key={group.category ? group.category.id : 'uncategorized'} className="bg-white">
-                    <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9px] text-slate-500">{group.category ? group.displayCode : '-'}</td>
-                    <td className="border border-slate-300 py-1.5 px-1.5 font-bold text-slate-950 uppercase text-[9px] tracking-wide">{catName}</td>
+                  <tr key={cat.id} className="bg-white">
+                    <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9px] text-slate-500">{index + 1}</td>
+                    <td className="border border-slate-300 py-1.5 px-1.5 font-bold text-slate-950 uppercase text-[9px] tracking-wide">{cat.name}</td>
                     <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono font-semibold text-slate-800 text-[9.5px]">{formatCurrency(catTotal)}</td>
                   </tr>
                 )
               })}
-              <tr className="font-semibold border-t border-slate-300 bg-white">
+            <tr className="font-semibold border-t border-slate-300 bg-white">
                 <td colSpan={2} className="border border-slate-300 py-1.5 px-1.5 text-right uppercase text-[8.5px] tracking-wider text-slate-400">Jumlah Subtotal Pekerjaan:</td>
                 <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono text-slate-700 text-[9.5px]">{formatCurrency(totalPrice)}</td>
               </tr>
@@ -823,29 +1092,46 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
               </tr>
             </thead>
             <tbody>
-              {reportGroups.map((group) => (
-                <React.Fragment key={group.category ? group.category.id : 'uncategorized'}>
-                  <tr className="bg-white font-bold text-slate-950 border-b border-slate-300">
-                    <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[10px]">{group.category ? group.displayCode : '-'}</td>
-                    <td colSpan={4} className="border border-slate-300 py-1.5 px-1.5 uppercase text-[9px] tracking-wide">
-                      {group.category ? group.category.name : 'Tanpa Kategori'}
-                    </td>
-                    <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono font-extrabold text-[10px]">
-                      {formatCurrency(group.lineItems.reduce((sum, item) => sum + item.totalPrice, 0))}
-                    </td>
-                  </tr>
-                  {group.lineItems.map((item) => (
-                    <tr key={item.wbsItemId} className="hover:bg-slate-50/20 bg-white">
-                      <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9px] text-slate-400">{item.wbsCode}</td>
-                      <td className="border border-slate-300 py-1.5 px-1.5 text-slate-800 font-normal leading-tight">{item.wbsName}</td>
-                      <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono">{item.volume}</td>
-                      <td className="border border-slate-300 py-1.5 px-1.5 text-center font-medium text-slate-500">{item.unit}</td>
-                      <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono text-slate-500">{formatCurrency(item.unitPrice)}</td>
-                      <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono font-semibold text-slate-800">{formatCurrency(item.totalPrice)}</td>
+              {wbsItems.map((item) => {
+                const level = item.wbsPath ? item.wbsPath.split('.').length - 1 : 0
+                
+                if (item.type === 'group') {
+                  const subtotal = getGroupSubtotal(item.wbsPath)
+                  return (
+                    <tr key={item.id} className="bg-slate-50 font-bold text-slate-950 border-b border-slate-300">
+                      <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9px]">{item.code}</td>
+                      <td colSpan={4} className="border border-slate-300 py-1.5 px-1.5 uppercase text-[9px] tracking-wide" style={{ paddingLeft: `${level * 12}px` }}>
+                        {item.name}
+                      </td>
+                      <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono font-extrabold text-[9.5px]">
+                        {formatCurrency(subtotal)}
+                      </td>
                     </tr>
-                  ))}
-                </React.Fragment>
-              ))}
+                  )
+                } else {
+                  const calcItem = calculation?.lineItems?.find(li => li.wbsItemId === item.id)
+                  const volItem = volumes.find(v => v.wbsItemId === item.id)
+                  const volume = volItem?.volume ?? 0
+                  const unit = volItem?.unit || item.unit
+                  let unitPrice = calcItem?.unitPrice ?? 0
+                  if (!calcItem && volItem?.ahsId) {
+                    const matchedAhs = ahsList.find(a => a.id === volItem.ahsId)
+                    unitPrice = matchedAhs?.totalPrice ?? 0
+                  }
+                  const total = volume * unitPrice
+
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50/20 bg-white">
+                      <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9px] text-slate-400">{item.code}</td>
+                      <td className="border border-slate-300 py-1.5 px-1.5 text-slate-800 font-normal leading-tight" style={{ paddingLeft: `${level * 12}px` }}>{item.name}</td>
+                      <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono">{volume}</td>
+                      <td className="border border-slate-300 py-1.5 px-1.5 text-center font-medium text-slate-500">{unit || '-'}</td>
+                      <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono text-slate-500">{formatCurrency(unitPrice)}</td>
+                      <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono font-semibold text-slate-800">{formatCurrency(total)}</td>
+                    </tr>
+                  )
+                }
+              })}
               <tr className="font-semibold border-t border-slate-300 bg-white">
                 <td colSpan={5} className="border border-slate-300 py-1.5 px-1.5 text-right uppercase text-[8.5px] tracking-wider text-slate-400">Subtotal Pekerjaan:</td>
                 <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono text-slate-700 text-[9.5px]">{formatCurrency(totalPrice)}</td>
@@ -1057,6 +1343,71 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
                 <td colSpan={5} className="border border-slate-300 py-2 px-1.5 text-right uppercase tracking-wider text-[9px] text-slate-700">Total Biaya Seluruh Komponen:</td>
                 <td className="border border-slate-300 py-2 px-1.5 text-right font-mono text-slate-950 font-extrabold text-[11px]">{formatCurrency(bomItems.reduce((s, i) => s + i.totalPrice, 0))}</td>
               </tr>
+            </tbody>
+          </table>
+        </section>
+
+        {/* SECTION 4: BACKUP VOLUME */}
+        <section className="print-page pb-8" style={{ pageBreakBefore: 'always' }}>
+          <div className="text-center border-b-2 border-slate-900 pb-3 mb-5">
+            <h1 className="text-[14px] font-extrabold tracking-widest uppercase text-slate-950">BACKUP PERHITUNGAN VOLUME PEKERJAAN</h1>
+            <div className="text-[9px] font-medium tracking-widest text-slate-500 uppercase mt-1">
+              Proyek: {project?.name} &bull; Lokasi: {project?.location} &bull; Tahun: {project?.year}
+            </div>
+          </div>
+          <table className="w-full border-collapse border border-slate-300 text-[9.5px] font-sans">
+            <thead>
+              <tr className="border-b-2 border-slate-900 text-[9px] font-bold uppercase tracking-wider text-slate-950 bg-white">
+                <th className="border border-slate-300 py-2 px-1.5 text-center align-middle w-14 font-bold">No WBS</th>
+                <th className="border border-slate-300 py-2 px-1.5 text-center align-middle font-bold w-1/4">Uraian Kategori & Pekerjaan</th>
+                <th className="border border-slate-300 py-2 px-1.5 text-center align-middle w-16 font-bold">Volume</th>
+                <th className="border border-slate-300 py-2 px-1.5 text-center align-middle w-14 font-bold">Satuan</th>
+                <th className="border border-slate-300 py-2 px-1.5 text-center align-middle font-bold">Rincian Perhitungan (Formula)</th>
+                <th className="border border-slate-300 py-2 px-1.5 text-center align-middle font-bold w-1/4">Catatan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {wbsItems.map((item) => {
+                const level = item.wbsPath ? item.wbsPath.split('.').length - 1 : 0
+                
+                if (item.type === 'group') {
+                  return (
+                    <tr key={item.id} className="bg-slate-50 font-bold text-slate-950 border-b border-slate-300">
+                      <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9px]">{item.code}</td>
+                      <td colSpan={5} className="border border-slate-300 py-1.5 px-1.5 uppercase text-[9px] tracking-wide" style={{ paddingLeft: `${level * 12}px` }}>
+                        {item.name}
+                      </td>
+                    </tr>
+                  )
+                }
+
+                const volItem = volumes.find(v => v.wbsItemId === item.id)
+                const linkedVol = volItem?.projectVolumeId 
+                  ? projectVolumes.find(pv => pv.id === volItem.projectVolumeId) 
+                  : null
+
+                const volume = linkedVol ? linkedVol.value : (volItem?.volume ?? 0)
+                const unit = linkedVol ? linkedVol.unit : (volItem?.unit || item.unit)
+                
+                const formulaSrc = linkedVol ? linkedVol.formula : (volItem?.formula || '')
+                const notesText = linkedVol ? linkedVol.notes : (volItem?.notes || '-')
+                
+                const hasBackup = formulaSrc && formulaSrc.trim().startsWith('{')
+                const formulaText = hasBackup ? parseFormulaToText(formulaSrc) : (linkedVol ? `Dihubungkan ke Volume: ${linkedVol.name}` : 'Manual Input')
+
+                return (
+                  <tr key={item.id} className="bg-white">
+                    <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9px] text-slate-400">{item.code}</td>
+                    <td className="border border-slate-300 py-1.5 px-1.5 text-slate-800 font-normal leading-tight" style={{ paddingLeft: `${level * 12}px` }}>{item.name}</td>
+                    <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono">{volume}</td>
+                    <td className="border border-slate-300 py-1.5 px-1.5 text-center font-medium text-slate-500">{unit || '-'}</td>
+                    <td className="border border-slate-300 py-1.5 px-1.5 text-left font-mono text-[8.5px] whitespace-pre-line leading-normal">
+                      {formulaText}
+                    </td>
+                    <td className="border border-slate-300 py-1.5 px-1.5 text-left text-slate-600 text-[8.5px] whitespace-pre-line">{notesText}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </section>

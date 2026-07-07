@@ -1,8 +1,9 @@
 import { RabSnapshotRepository } from '../database/repositories/rab-repository'
 import { VolumeItemRepository } from '../database/repositories/volume-repository'
+import { ProjectVolumeRepository } from '../database/repositories/project-volume-repository'
 import { AhsRepository } from '../database/repositories/ahs-repository'
 import { WbsItemRepository } from '../database/repositories/wbs-repository'
-import { RabSnapshot } from '../database/repositories/types'
+import { RabSnapshot, ProjectVolume } from '../database/repositories/types'
 import { ServiceResult, success, failure } from './base-service'
 
 export interface RabLineItem {
@@ -32,12 +33,61 @@ export interface RabCalculation {
 export class RabService {
   private snapshotRepo = new RabSnapshotRepository()
   private volumeRepo = new VolumeItemRepository()
+  private projectVolumeRepo = new ProjectVolumeRepository()
   private ahsRepo = new AhsRepository()
   private wbsRepo = new WbsItemRepository()
+
+  private evaluateProjectVolumes(volumes: ProjectVolume[]): ProjectVolume[] {
+    const resolved = volumes.map(v => ({ ...v, value: v.value }))
+    
+    for (let iteration = 0; iteration < 5; iteration++) {
+      let changed = false
+      
+      for (const vol of resolved) {
+        if (!vol.formula) continue
+        try {
+          const parsed = JSON.parse(vol.formula)
+          if (parsed.type === 'simple' && parsed.data) {
+            const formulaStr = parsed.data.formula || ''
+            if (!formulaStr) continue
+            
+            let expression = formulaStr
+            const sortedVars = [...resolved].sort((a, b) => b.name.length - a.name.length)
+            
+            for (const v of sortedVars) {
+              if (v.id === vol.id) continue
+              const escapedName = v.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+              const regex = new RegExp(`\\[${escapedName}\\]`, 'g')
+              if (regex.test(expression)) {
+                expression = expression.replace(regex, String(v.value))
+              }
+            }
+            
+            const sanitized = expression.replace(/[^0-9+\-*/().\s]/g, '')
+            if (sanitized.trim()) {
+              const newValue = new Function(`return (${sanitized})`)()
+              if (typeof newValue === 'number' && !isNaN(newValue) && vol.value !== newValue) {
+                vol.value = newValue
+                changed = true
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+      
+      if (!changed) break
+    }
+    
+    return resolved
+  }
 
   calculate(projectId: string, ppnPercent: number, overheadPercent: number): ServiceResult<RabCalculation> {
     try {
       const volumes = this.volumeRepo.getByProjectId(projectId)
+      const rawProjectVolumes = this.projectVolumeRepo.getByProjectId(projectId)
+      const projectVolumes = this.evaluateProjectVolumes(rawProjectVolumes)
       const lineItems: RabLineItem[] = []
 
       for (const v of volumes) {
@@ -57,7 +107,15 @@ export class RabService {
           }
         }
 
-        const total = v.volume * unitPrice
+        // Get volume from linked ProjectVolume if projectVolumeId is set
+        const linkedVol = v.projectVolumeId 
+          ? projectVolumes.find(pv => pv.id === v.projectVolumeId) 
+          : null
+        
+        const volume = linkedVol ? linkedVol.value : v.volume
+        const unit = linkedVol ? linkedVol.unit : (v.unit || wbs.unit)
+
+        const total = volume * unitPrice
         lineItems.push({
           wbsItemId: v.wbsItemId,
           wbsPath: wbs.wbsPath,
@@ -66,8 +124,8 @@ export class RabService {
           ahsId: v.ahsId,
           ahsCode,
           ahsName,
-          unit: v.unit || wbs.unit,
-          volume: v.volume,
+          unit,
+          volume,
           unitPrice,
           totalPrice: total
         })

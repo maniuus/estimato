@@ -5,6 +5,7 @@ import { MasterDataService } from '../services/master-data-service'
 import { WbsService } from '../services/wbs-service'
 import { AhsService } from '../services/ahs-service'
 import { VolumeService } from '../services/volume-service'
+import { ProjectVolumeService } from '../services/project-volume-service'
 import { RabService } from '../services/rab-service'
 import { SettingsService } from '../services/settings-service'
 import { AhspImportService } from '../services/ahsp-import-service'
@@ -18,6 +19,7 @@ export function registerIpcHandlers(): void {
   const wbsService = new WbsService()
   const ahsService = new AhsService()
   const volumeService = new VolumeService()
+  const projectVolumeService = new ProjectVolumeService()
   const rabService = new RabService()
   const settingsService = new SettingsService()
   const ahspImportService = new AhspImportService()
@@ -88,6 +90,11 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.VOLUME_UPSERT, (_e, wbsItemId: string, data) => volumeService.upsert(wbsItemId, data))
   ipcMain.handle(IPC_CHANNELS.VOLUME_BULK_UPSERT, (_e, items: unknown[]) => volumeService.bulkUpsert(items as any))
   ipcMain.handle(IPC_CHANNELS.VOLUME_DELETE, (_e, id: string) => volumeService.delete(id))
+
+  // Project Volume
+  ipcMain.handle(IPC_CHANNELS.PROJECT_VOLUME_GET_BY_PROJECT, (_e, projectId: string) => projectVolumeService.getByProject(projectId))
+  ipcMain.handle(IPC_CHANNELS.PROJECT_VOLUME_UPSERT, (_e, projectId: string, data) => projectVolumeService.upsert(projectId, data as any))
+  ipcMain.handle(IPC_CHANNELS.PROJECT_VOLUME_DELETE, (_e, id: string) => projectVolumeService.delete(id))
 
   // RAB
   ipcMain.handle(IPC_CHANNELS.RAB_CALCULATE, (_e, projectId: string, ppn: number, overhead: number) => rabService.calculate(projectId, ppn, overhead))
