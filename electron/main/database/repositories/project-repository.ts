@@ -8,9 +8,19 @@ export class ProjectRepository extends BaseRepository<Project> {
     const id = this.generateId()
     const now = this.now()
     this.executeInsert(
-      `INSERT INTO "Project" (id, name, projectNumber, location, year, buildingType, buildingArea, floors, status, ppn, overhead, note, createdAt, updatedAt)
-       VALUES (@id, @name, @projectNumber, @location, @year, @buildingType, @buildingArea, @floors, @status, @ppn, @overhead, @note, @createdAt, @updatedAt)`,
-      { ...data, id, createdAt: now, updatedAt: now }
+      `INSERT INTO "Project" (id, name, projectNumber, location, year, buildingType, buildingArea, floors, status, ppn, overhead, note, companyName, companyLogo, reportHeader, ownerName, ownerParaf, createdAt, updatedAt)
+       VALUES (@id, @name, @projectNumber, @location, @year, @buildingType, @buildingArea, @floors, @status, @ppn, @overhead, @note, @companyName, @companyLogo, @reportHeader, @ownerName, @ownerParaf, @createdAt, @updatedAt)`,
+      { 
+        companyName: '',
+        companyLogo: '',
+        reportHeader: '',
+        ownerName: '',
+        ownerParaf: '',
+        ...data, 
+        id, 
+        createdAt: now, 
+        updatedAt: now 
+      }
     )
     return this.getById(id)!
   }

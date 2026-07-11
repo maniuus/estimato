@@ -11,6 +11,11 @@ CREATE TABLE IF NOT EXISTS Project (
   ppn           REAL DEFAULT 11,
   overhead      REAL DEFAULT 0,
   note          TEXT DEFAULT '',
+  companyName   TEXT DEFAULT '',
+  companyLogo   TEXT DEFAULT '',
+  reportHeader  TEXT DEFAULT '',
+  ownerName     TEXT DEFAULT '',
+  ownerParaf    TEXT DEFAULT '',
   createdAt     TEXT NOT NULL DEFAULT (datetime('now')),
   updatedAt     TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -139,6 +144,8 @@ CREATE TABLE IF NOT EXISTS AppSetting (
   companyName   TEXT DEFAULT '',
   companyLogo   TEXT DEFAULT '',
   reportHeader  TEXT DEFAULT '',
+  ownerName     TEXT DEFAULT '',
+  ownerParaf     TEXT DEFAULT '',
   ppnDefault    REAL DEFAULT 11,
   createdAt     TEXT NOT NULL DEFAULT (datetime('now')),
   updatedAt     TEXT NOT NULL DEFAULT (datetime('now'))

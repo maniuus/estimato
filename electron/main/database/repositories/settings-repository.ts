@@ -11,6 +11,8 @@ export class AppSettingRepository extends BaseRepository<AppSetting> {
       companyName: '',
       companyLogo: '',
       reportHeader: '',
+      ownerName: '',
+      ownerParaf: '',
       ppnDefault: 11,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

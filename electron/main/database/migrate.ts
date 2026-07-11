@@ -14,6 +14,11 @@ CREATE TABLE IF NOT EXISTS Project (
   ppn           REAL DEFAULT 11,
   overhead      REAL DEFAULT 0,
   note          TEXT DEFAULT '',
+  companyName   TEXT DEFAULT '',
+  companyLogo   TEXT DEFAULT '',
+  reportHeader  TEXT DEFAULT '',
+  ownerName     TEXT DEFAULT '',
+  ownerParaf    TEXT DEFAULT '',
   createdAt     TEXT NOT NULL DEFAULT (datetime('now')),
   updatedAt     TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -157,6 +162,8 @@ CREATE TABLE IF NOT EXISTS AppSetting (
   companyName   TEXT DEFAULT '',
   companyLogo   TEXT DEFAULT '',
   reportHeader  TEXT DEFAULT '',
+  ownerName     TEXT DEFAULT '',
+  ownerParaf     TEXT DEFAULT '',
   ppnDefault    REAL DEFAULT 11,
   createdAt     TEXT NOT NULL DEFAULT (datetime('now')),
   updatedAt     TEXT NOT NULL DEFAULT (datetime('now'))
@@ -194,6 +201,29 @@ export function runMigrations(): void {
     db.run('ALTER TABLE "VolumeItem" ADD COLUMN projectVolumeId TEXT;')
   } catch (e) {
     // Column already exists
+  }
+
+  // Alter AppSetting to add ownerName and ownerParaf if they don't exist
+  try {
+    db.run('ALTER TABLE "AppSetting" ADD COLUMN ownerName TEXT DEFAULT "";')
+  } catch (e) {
+    // Column already exists
+  }
+
+  try {
+    db.run('ALTER TABLE "AppSetting" ADD COLUMN ownerParaf TEXT DEFAULT "";')
+  } catch (e) {
+    // Column already exists
+  }
+
+  // Alter Project to add companyName, companyLogo, reportHeader, ownerName, ownerParaf if they don't exist
+  const projectCols = ['companyName', 'companyLogo', 'reportHeader', 'ownerName', 'ownerParaf']
+  for (const col of projectCols) {
+    try {
+      db.run(`ALTER TABLE "Project" ADD COLUMN "${col}" TEXT DEFAULT '';`)
+    } catch (e) {
+      // Column already exists
+    }
   }
 
   saveDatabase()

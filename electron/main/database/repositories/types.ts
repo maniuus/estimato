@@ -11,6 +11,11 @@ export interface Project {
   ppn: number
   overhead: number
   note: string
+  companyName?: string
+  companyLogo?: string
+  reportHeader?: string
+  ownerName?: string
+  ownerParaf?: string
   createdAt: string
   updatedAt: string
   grandTotal?: number
@@ -141,6 +146,8 @@ export interface AppSetting {
   companyName: string
   companyLogo: string
   reportHeader: string
+  ownerName: string
+  ownerParaf: string
   ppnDefault: number
   createdAt: string
   updatedAt: string

@@ -10,6 +10,7 @@ interface ProjectFormProps {
 
 export function ProjectForm({ onClose, initialData }: ProjectFormProps): React.ReactElement {
   const { createProject, updateProject, loadProjects } = useProjectStore()
+  const [showCustomKop, setShowCustomKop] = useState(false)
   const [form, setForm] = React.useState({
     name: initialData?.name ?? '',
     projectNumber: initialData?.projectNumber ?? '',
@@ -22,9 +23,25 @@ export function ProjectForm({ onClose, initialData }: ProjectFormProps): React.R
     ppn: initialData?.ppn ?? 11,
     overhead: initialData?.overhead ?? 0,
     note: initialData?.note ?? '',
+    companyName: initialData?.companyName ?? '',
+    companyLogo: initialData?.companyLogo ?? '',
+    reportHeader: initialData?.reportHeader ?? '',
+    ownerName: initialData?.ownerName ?? '',
+    ownerParaf: initialData?.ownerParaf ?? '',
     template: 'blank'
   })
   const [saving, setSaving] = useState(false)
+
+  const handleImageUpload = (file: File, field: 'companyLogo' | 'ownerParaf') => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (reader.result) {
+        setForm(prev => ({ ...prev, [field]: reader.result as string }))
+      }
+    }
+    reader.readAsDataURL(file)
+  }
 
   const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -100,8 +117,128 @@ export function ProjectForm({ onClose, initialData }: ProjectFormProps): React.R
               <textarea className="input-field" rows={3} value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
             </div>
 
+            {/* Collapsible Section for Custom Kop & Owner */}
+            <div className="col-span-2 border-t border-gray-200 pt-3 mt-1">
+              <button
+                type="button"
+                onClick={() => setShowCustomKop(!showCustomKop)}
+                className="w-full flex items-center justify-between text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 hover:bg-gray-100 p-2 rounded transition-all"
+              >
+                <span>⚙️ Kustomisasi Kop & Owner Laporan (Opsional)</span>
+                <span>{showCustomKop ? '▲ Tutup' : '▼ Buka'}</span>
+              </button>
+
+              {showCustomKop && (
+                <div className="mt-3 space-y-3 p-3 bg-gray-50/50 rounded-lg border border-gray-100">
+                  <p className="text-[10px] text-gray-400 italic mb-2">
+                    * Kosongkan jika ingin menggunakan logo dan pengaturan dari Pengaturan Global aplikasi.
+                  </p>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="col-span-2 md:col-span-1">
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">Nama Perusahaan Kustom</label>
+                      <input 
+                        className="input-field text-xs" 
+                        placeholder="CV. Mandiri Jaya (Kustom)"
+                        value={form.companyName} 
+                        onChange={e => setForm({ ...form, companyName: e.target.value })} 
+                      />
+                    </div>
+                    
+                    <div className="col-span-2 md:col-span-1">
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">Header Laporan Kustom</label>
+                      <input 
+                        className="input-field text-xs" 
+                        placeholder="KONSULTAN PERENCANA"
+                        value={form.reportHeader} 
+                        onChange={e => setForm({ ...form, reportHeader: e.target.value })} 
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-[11px] font-medium text-gray-600 mb-1">Nama Owner Kustom</label>
+                      <input 
+                        className="input-field text-xs" 
+                        placeholder="Ir. Budi Santoso (Kustom)"
+                        value={form.ownerName} 
+                        onChange={e => setForm({ ...form, ownerName: e.target.value })} 
+                      />
+                    </div>
+
+                    <div className="col-span-2 md:col-span-1">
+                      <label className="block text-[11px] font-semibold text-gray-700 mb-1">Logo Kustom</label>
+                      <div className="flex flex-col gap-2 p-2 border border-gray-200 rounded bg-white">
+                        {form.companyLogo ? (
+                          <div className="relative w-fit">
+                            <img 
+                              src={form.companyLogo} 
+                              alt="Logo Preview" 
+                              className="h-12 w-12 object-contain border border-gray-100 rounded"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setForm({ ...form, companyLogo: '' })}
+                              className="absolute -top-1 -right-1 bg-red-650 hover:bg-red-700 text-white rounded-full h-4 w-4 flex items-center justify-center shadow-sm leading-none"
+                              style={{ fontSize: '10px' }}
+                            >
+                              &times;
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-gray-400 italic">Menggunakan logo global</div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleImageUpload(file, 'companyLogo')
+                          }}
+                          className="block w-full text-[10px] text-gray-500 file:mr-2 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="col-span-2 md:col-span-1">
+                      <label className="block text-[11px] font-semibold text-gray-700 mb-1">Paraf Owner Kustom</label>
+                      <div className="flex flex-col gap-2 p-2 border border-gray-200 rounded bg-white">
+                        {form.ownerParaf ? (
+                          <div className="relative w-fit">
+                            <img 
+                              src={form.ownerParaf} 
+                              alt="Paraf Preview" 
+                              className="h-12 w-12 object-contain border border-gray-100 rounded"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setForm({ ...form, ownerParaf: '' })}
+                              className="absolute -top-1 -right-1 bg-red-650 hover:bg-red-700 text-white rounded-full h-4 w-4 flex items-center justify-center shadow-sm leading-none"
+                              style={{ fontSize: '10px' }}
+                            >
+                              &times;
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-gray-400 italic">Menggunakan paraf global</div>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleImageUpload(file, 'ownerParaf')
+                          }}
+                          className="block w-full text-[10px] text-gray-500 file:mr-2 file:py-0.5 file:px-1.5 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {!initialData && (
-              <div className="col-span-2 space-y-1.5">
+              <div className="col-span-2 space-y-1.5 pt-1">
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
                   Pilih Template Proyek
                 </label>
@@ -152,7 +289,7 @@ export function ProjectForm({ onClose, initialData }: ProjectFormProps): React.R
             )}
           </div>
 
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-2 pt-2 border-t border-gray-100">
             <button type="submit" disabled={saving} className="btn-primary flex-1">
               {saving ? 'Menyimpan...' : 'Simpan'}
             </button>

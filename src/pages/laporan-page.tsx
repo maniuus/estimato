@@ -5,6 +5,7 @@ import { useProjectVolumeStore } from '../stores/project-volume-store'
 import { useAhsStore } from '../stores/ahs-store'
 import { useProjectStore } from '../stores/project-store'
 import { useWbsStore } from '../stores/wbs-store'
+import { useSettingsStore } from '../stores/settings-store'
 import { formatCurrency } from '../lib/format'
 import type { Ahs, AhsComponentMaterial, AhsComponentWage, AhsComponentEquipment, WbsItem } from '../types/models'
 
@@ -266,12 +267,13 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
   const { ahsList, loadLibrary } = useAhsStore()
   const { projects } = useProjectStore()
   const { items: wbsItems, loadByProject: loadWbs } = useWbsStore()
+  const { settings, load: loadSettings } = useSettingsStore()
 
   const project = projects.find(p => p.id === projectId)
   const ppn = project?.ppn ?? 11
   const overhead = project?.overhead ?? 0
 
-  const [previewTab, setPreviewTab] = useState<'rekap' | 'rab' | 'analisa' | 'bom' | 'backup'>('rekap')
+  const [previewTab, setPreviewTab] = useState<'rekap' | 'rab' | 'analisa' | 'bom' | 'backup' | 'analisis_kurvas'>('rekap')
   const [detailedAhsList, setDetailedAhsList] = useState<DetailedAhsData[]>([])
   const [bomItems, setBomItems] = useState<BomItem[]>([])
   const [loadingDetails, setLoadingDetails] = useState(false)
@@ -286,6 +288,7 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
     loadProjectVolumes(projectId)
     loadLibrary()
     loadLatest(projectId)
+    loadSettings()
   }, [projectId])
 
   // Load detailed analysis and BOM components
@@ -454,6 +457,80 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
   const rekapCategories = wbsItems.filter(i => i.type === 'group' && !i.parentId)
   rekapCategories.sort((a, b) => a.sortOrder - b.sortOrder)
 
+  // ── S-CURVE STATES & HELPERS ──
+  const [durationWeeks, setDurationWeeks] = useState(12)
+  const [categorySchedules, setCategorySchedules] = useState<Record<string, { startWeek: number, endWeek: number }>>({})
+
+  // Initialize schedules if empty
+  useEffect(() => {
+    if (rekapCategories.length > 0) {
+      setCategorySchedules(prev => {
+        const next = { ...prev }
+        let changed = false
+        rekapCategories.forEach((cat, index) => {
+          if (!next[cat.id]) {
+            // Distribute default weeks sequentially with overlap
+            const start = Math.floor((index / rekapCategories.length) * (durationWeeks - 1)) + 1
+            const duration = Math.max(2, Math.floor(durationWeeks / rekapCategories.length) + 1)
+            const end = Math.min(durationWeeks, start + duration - 1)
+            next[cat.id] = { startWeek: start, endWeek: end }
+            changed = true
+          }
+        })
+        if (changed) return next
+        return prev
+      })
+    }
+  }, [rekapCategories, durationWeeks])
+
+  // Scale schedules when duration changes
+  const handleDurationChange = (newWeeks: number) => {
+    const oldWeeks = durationWeeks
+    setDurationWeeks(newWeeks)
+    setCategorySchedules(prev => {
+      const next = { ...prev }
+      Object.keys(next).forEach(id => {
+        const { startWeek, endWeek } = next[id]
+        const newStart = Math.max(1, Math.min(newWeeks, Math.round((startWeek / oldWeeks) * newWeeks)))
+        const newEnd = Math.max(newStart, Math.min(newWeeks, Math.round((endWeek / oldWeeks) * newWeeks)))
+        next[id] = { startWeek: newStart, endWeek: newEnd }
+      })
+      return next
+    })
+  }
+
+  // Calculate schedules
+  const calculateSCurveData = () => {
+    const totalBasePrice = totalPrice || 1 // Avoid divide-by-zero
+    const weeklyProgress = Array(durationWeeks).fill(0)
+    
+    // Calculate weight of each category and distribute
+    rekapCategories.forEach(cat => {
+      const catTotal = getGroupSubtotal(cat.wbsPath)
+      const weight = (catTotal / totalBasePrice) * 100
+      
+      const sched = categorySchedules[cat.id] || { startWeek: 1, endWeek: Math.min(durationWeeks, 3) }
+      const start = Math.max(1, Math.min(durationWeeks, sched.startWeek))
+      const end = Math.max(start, Math.min(durationWeeks, sched.endWeek))
+      const activeWeeks = end - start + 1
+      const weeklyShare = weight / activeWeeks
+      
+      for (let w = start; w <= end; w++) {
+        weeklyProgress[w - 1] += weeklyShare
+      }
+    })
+
+    // Calculate cumulative progress
+    const cumulativeProgress: number[] = []
+    let sum = 0
+    for (let w = 0; w < durationWeeks; w++) {
+      sum += weeklyProgress[w]
+      cumulativeProgress.push(Math.min(100, sum))
+    }
+
+    return { weeklyProgress, cumulativeProgress }
+  }
+
   const handleExportExcel = async () => {
     if (!project || !calculation) return
     setExporting(true)
@@ -542,6 +619,692 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
   const grandTotal = calculation.grandTotal
   const roundedGrandTotal = Math.round(grandTotal / 1000) * 1000
 
+  const activeCompanyLogo = project?.companyLogo || settings?.companyLogo || ''
+  const activeCompanyName = project?.companyName || settings?.companyName || ''
+  const activeReportHeader = project?.reportHeader || settings?.reportHeader || ''
+  const activeOwnerName = project?.ownerName || settings?.ownerName || ''
+  const activeOwnerParaf = project?.ownerParaf || settings?.ownerParaf || ''
+
+  const renderPrintHeader = (title: string) => {
+    return (
+      <div className="mb-4 text-[9.5px] font-sans bg-white no-break-inside text-slate-950 w-full">
+        {/* ROW 1: Logo and Company Info / Document Title */}
+        <div className="flex items-center justify-between pb-1.5">
+          {/* Logo Perusahaan */}
+          <div className="w-[80px] p-1 flex items-center justify-start bg-white">
+            {activeCompanyLogo ? (
+              <img 
+                src={activeCompanyLogo} 
+                alt="Logo" 
+                className="max-h-[48px] max-w-[80px] object-contain"
+              />
+            ) : (
+              <div className="text-[8px] font-bold text-slate-300 uppercase leading-tight">
+                {activeCompanyName || 'LOGO'}
+              </div>
+            )}
+          </div>
+
+          {/* Nama Perusahaan & Judul Laporan */}
+          <div className="flex-1 p-1 flex flex-col justify-center items-center text-center bg-white leading-tight">
+            <div className="font-extrabold text-[12px] text-slate-950 uppercase tracking-wide">
+              {activeCompanyName || 'CV. KARYA MANDIRI'}
+            </div>
+            <div className="text-[7.5px] text-slate-500 font-semibold uppercase tracking-wider mb-0.5">
+              {activeReportHeader || 'KONSULTAN PERENCANA / KONTRAKTOR'}
+            </div>
+            <div className="font-black text-[12.5px] text-slate-950 uppercase tracking-wider">
+              {title}
+            </div>
+          </div>
+
+          {/* Spacer to keep center alignment perfect */}
+          <div className="w-[80px] p-1"></div>
+        </div>
+
+        {/* Thick line separator typical of Kop Surat */}
+        <div className="border-b-[1.5px] border-slate-900 mb-2.5 w-full"></div>
+
+        {/* ROW 2: Project Details (Stacked - Left Aligned) */}
+        <div className="pb-2 flex flex-col items-start justify-center text-[9px] w-full space-y-0.5 leading-normal pl-1">
+          <div>
+            <span className="font-bold text-slate-400 uppercase mr-1">Proyek:</span> 
+            <span className="font-bold text-slate-900 uppercase">{project?.name}</span>
+          </div>
+          <div>
+            <span className="font-bold text-slate-400 uppercase mr-1">Lokasi:</span> 
+            <span className="font-bold text-slate-900 uppercase">{project?.location}</span>
+          </div>
+          <div>
+            <span className="font-bold text-slate-400 uppercase mr-1">Tahun:</span> 
+            <span className="font-bold text-slate-900">{project?.year}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderPrintFooter = () => {
+    return (
+      <div 
+        className="mt-6 flex justify-end text-[9px] font-sans bg-white"
+        style={{ 
+          pageBreakInside: 'avoid', 
+          breakInside: 'avoid',
+          pageBreakBefore: 'avoid',
+          breakBefore: 'avoid'
+        }}
+      >
+        <div className="w-[200px] text-center flex flex-col items-center p-2">
+          <div className="text-slate-500">Setuju &amp; Disahkan Oleh:</div>
+          <div className="font-bold uppercase mt-0.5 text-slate-900">Owner / Pemilik Proyek</div>
+          <div className="h-[50px] flex items-center justify-center my-1">
+            {activeOwnerParaf ? (
+              <img 
+                src={activeOwnerParaf} 
+                alt="Paraf Owner" 
+                className="max-h-[48px] max-w-[120px] object-contain"
+              />
+            ) : (
+              <div className="text-[7.5px] text-slate-350 italic">Tanda Tangan / Paraf</div>
+            )}
+          </div>
+          <div className="font-bold underline uppercase text-slate-950 truncate w-full">
+            {activeOwnerName || '...........................'}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderAnalisisKurvaS = (isPrint: boolean = false) => {
+    const { weeklyProgress, cumulativeProgress } = calculateSCurveData()
+    const maxWeeklyProgVal = Math.max(...weeklyProgress, 10)
+    const leftYAxisMax = Math.ceil(maxWeeklyProgVal / 5) * 5
+    
+    // Chart dimensions
+    const svgWidth = isPrint ? 680 : 780
+    const svgHeight = isPrint ? 240 : 320
+    const padLeft = 50
+    const padRight = 50
+    const padTop = 30
+    const padBottom = 35
+    
+    const plotWidth = svgWidth - padLeft - padRight
+    const plotHeight = svgHeight - padTop - padBottom
+
+    // Smooth path generator function (Catmull-Rom to Cubic Bezier)
+    const getSmoothPath = (pts: { x: number, y: number }[], closedBottomY?: number) => {
+      if (pts.length === 0) return { linePath: '', areaPath: '' }
+      
+      let linePathStr = `M ${pts[0].x} ${pts[0].y}`
+      const tension = 0.15
+      
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i - 1] || pts[i]
+        const p1 = pts[i]
+        const p2 = pts[i + 1]
+        const p3 = pts[i + 2] || p2
+        
+        const cp1x = p1.x + (p2.x - p0.x) * tension
+        const cp1y = p1.y + (p2.y - p0.y) * tension
+        
+        const cp2x = p2.x - (p3.x - p1.x) * tension
+        const cp2y = p2.y - (p3.y - p1.y) * tension
+        
+        linePathStr += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`
+      }
+      
+      let areaPathStr = linePathStr
+      if (closedBottomY !== undefined) {
+        areaPathStr += ` L ${pts[pts.length - 1].x} ${closedBottomY} L ${pts[0].x} ${closedBottomY} Z`
+      }
+      
+      return { linePath: linePathStr, areaPath: areaPathStr }
+    }
+
+    // Build the array of coordinate points for spline calculation
+    const points = [
+      { x: padLeft, y: padTop + plotHeight } // Week 0 (0%)
+    ]
+    
+    cumulativeProgress.forEach((pct, w) => {
+      points.push({
+        x: padLeft + (w + 0.5) * (plotWidth / durationWeeks),
+        y: padTop + plotHeight - (pct / 100) * plotHeight
+      })
+    })
+    
+    // Add end point at the very right of the chart (100% progress)
+    points.push({
+      x: padLeft + plotWidth,
+      y: padTop + plotHeight - (cumulativeProgress[durationWeeks - 1] / 100) * plotHeight
+    })
+    
+    const { linePath, areaPath } = getSmoothPath(points, padTop + plotHeight)
+
+    if (isPrint) {
+      return (
+        <div className="space-y-4 text-[9.5px]">
+          {/* Table of Weights and Schedules */}
+          <div className="space-y-2">
+            <div className="font-bold text-slate-950 uppercase text-[9.5px] tracking-wide border-b border-slate-900 pb-1">
+              I. TABEL BOBOT PEKERJAAN & JADWAL RENCANA PELAKSANAAN
+            </div>
+            <table className="w-full border-collapse border border-slate-300 text-[9.5px] font-sans">
+              <thead>
+                <tr className="border-b border-slate-900 font-bold uppercase text-slate-950 bg-slate-50">
+                  <th className="border border-slate-300 py-1.5 px-1 text-center w-10">No</th>
+                  <th className="border border-slate-300 py-1.5 px-1.5 text-left">Kategori Pekerjaan</th>
+                  <th className="border border-slate-300 py-1.5 px-1.5 text-right w-40">Biaya Total (Rp)</th>
+                  <th className="border border-slate-300 py-1.5 px-1.5 text-center w-24">Bobot Pekerjaan (%)</th>
+                  <th className="border border-slate-300 py-1.5 px-1.5 text-center w-36">Jadwal Rencana Kerja</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rekapCategories.map((cat, index) => {
+                  const cost = getGroupSubtotal(cat.wbsPath)
+                  const weight = totalPrice > 0 ? (cost / totalPrice) * 100 : 0
+                  const sched = categorySchedules[cat.id] || { startWeek: 1, endWeek: 3 }
+                  return (
+                    <tr key={cat.id} className="bg-white">
+                      <td className="border border-slate-300 py-1 px-1 text-center font-mono text-[9px] text-slate-500">{index + 1}</td>
+                      <td className="border border-slate-300 py-1 px-1.5 font-bold text-slate-950 uppercase text-[9px]">{cat.name}</td>
+                      <td className="border border-slate-300 py-1 px-1.5 text-right font-mono text-[9.5px]">{formatCurrency(cost)}</td>
+                      <td className="border border-slate-300 py-1 px-1.5 text-center font-mono font-bold text-[9.5px] text-slate-900">{weight.toFixed(2)}%</td>
+                      <td className="border border-slate-300 py-1 px-1.5 text-center font-bold text-primary-900 text-[9.5px]">Minggu {sched.startWeek} - {sched.endWeek}</td>
+                    </tr>
+                  )
+                })}
+                <tr className="font-bold border-t border-slate-900 bg-white">
+                  <td colSpan={2} className="border border-slate-300 py-1.5 px-1.5 text-right uppercase text-[8.5px] tracking-wider text-slate-400">Jumlah Total Pekerjaan (RAB Utama):</td>
+                  <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono text-[9.5px] text-slate-800">{formatCurrency(totalPrice)}</td>
+                  <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9.5px] text-slate-900">100.00%</td>
+                  <td className="border border-slate-300 py-1.5 px-1.5 text-center text-slate-400 font-normal">-</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* S-Curve Chart (Printed version) */}
+          <div className="space-y-2" style={{ pageBreakInside: 'avoid' }}>
+            <div className="font-bold text-slate-950 uppercase text-[9.5px] tracking-wide border-b border-slate-900 pb-1">
+              II. GRAFIK RENCANA PROGRESS JADWAL PELAKSANAAN (KURVA S)
+            </div>
+            
+            {/* Legend info in print */}
+            <div className="flex justify-end gap-6 text-[8px] font-bold text-slate-950 py-0.5">
+              <span className="flex items-center gap-1">
+                <span className="w-2.5 h-2.5 bg-blue-500 opacity-60 rounded-sm inline-block"></span> Rencana Progress Mingguan (%)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3.5 h-0.5 bg-amber-600 inline-block relative top-[-1px]"></span>
+                <span className="w-1.5 h-1.5 bg-amber-600 rounded-full inline-block relative left-[-7px]"></span> Rencana Progress Kumulatif (Kurva-S, %)
+              </span>
+            </div>
+
+            <div className="flex justify-center border border-slate-300 p-2 rounded bg-white">
+              <svg width={svgWidth} height={svgHeight} className="font-sans">
+                <defs>
+                  <linearGradient id="scurve-gradient-print" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.2" />
+                    <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+
+                {/* Horizontal Grid lines and Axis Ticks */}
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const yVal = padTop + (plotHeight * i) / 4
+                  const cumPct = 100 - i * 25
+                  const weekPct = (leftYAxisMax * (4 - i)) / 4
+                  return (
+                    <g key={i}>
+                      <line 
+                        x1={padLeft} 
+                        y1={yVal} 
+                        x2={padLeft + plotWidth} 
+                        y2={yVal} 
+                        stroke="#e2e8f0" 
+                        strokeWidth="0.75" 
+                      />
+                      <text 
+                        x={padLeft - 8} 
+                        y={yVal + 3} 
+                        textAnchor="end" 
+                        className="text-[8px] fill-slate-600 font-mono font-semibold"
+                      >
+                        {weekPct.toFixed(1)}%
+                      </text>
+                      <text 
+                        x={padLeft + plotWidth + 8} 
+                        y={yVal + 3} 
+                        textAnchor="start" 
+                        className="text-[8px] fill-amber-700 font-mono font-bold"
+                      >
+                        {cumPct}%
+                      </text>
+                    </g>
+                  )
+                })}
+
+                {/* Vertical Grid Lines and X axis Labels */}
+                {Array.from({ length: durationWeeks }).map((_, w) => {
+                  const xVal = padLeft + (w + 0.5) * (plotWidth / durationWeeks)
+                  const xLineVal = padLeft + (w + 1) * (plotWidth / durationWeeks)
+                  return (
+                    <g key={w}>
+                      {w < durationWeeks - 1 && (
+                        <line 
+                          x1={xLineVal} 
+                          y1={padTop} 
+                          x2={xLineVal} 
+                          y2={padTop + plotHeight} 
+                          stroke="#cbd5e1" 
+                          strokeWidth="0.5" 
+                          strokeDasharray="2,2"
+                        />
+                      )}
+                      <text 
+                        x={xVal} 
+                        y={padTop + plotHeight + 12} 
+                        textAnchor="middle" 
+                        className="text-[8px] fill-slate-700 font-bold font-mono"
+                      >
+                        M{w + 1}
+                      </text>
+                    </g>
+                  )
+                })}
+
+                {/* Weekly Progress Bars */}
+                {weeklyProgress.map((prog, w) => {
+                  const xCenter = padLeft + (w + 0.5) * (plotWidth / durationWeeks)
+                  const barWidth = Math.max(8, (plotWidth / durationWeeks) * 0.45)
+                  const barHeight = (prog / leftYAxisMax) * plotHeight
+                  const yVal = padTop + plotHeight - barHeight
+                  
+                  return (
+                    <g key={w}>
+                      <rect
+                        x={xCenter - barWidth / 2}
+                        y={yVal}
+                        width={barWidth}
+                        height={Math.max(0, barHeight)}
+                        fill="#3b82f6"
+                        rx="1"
+                        className="opacity-60"
+                      />
+                      {prog > 0 && (
+                        <text
+                          x={xCenter}
+                          y={Math.max(padTop + 8, yVal - 3)}
+                          textAnchor="middle"
+                          className="text-[7px] fill-blue-800 font-mono font-bold"
+                        >
+                          {prog.toFixed(1)}%
+                        </text>
+                      )}
+                    </g>
+                  )
+                })}
+
+                {/* Cumulative S-Curve Area under line */}
+                <path d={areaPath.replace(/scurve-gradient/g, 'scurve-gradient-print')} fill="url(#scurve-gradient-print)" />
+
+                {/* Cumulative S-Curve Line */}
+                <path
+                  d={linePath}
+                  fill="none"
+                  stroke="#d97706"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+
+                {/* S-Curve Circle Nodes and percentage text always visible in print */}
+                {cumulativeProgress.map((pct, w) => {
+                  const xVal = padLeft + (w + 0.5) * (plotWidth / durationWeeks)
+                  const yVal = padTop + plotHeight - (pct / 100) * plotHeight
+                  return (
+                    <g key={w}>
+                      <circle
+                        cx={xVal}
+                        cy={yVal}
+                        r="3.5"
+                        fill="#d97706"
+                        stroke="#ffffff"
+                        strokeWidth="1.5"
+                      />
+                      <text
+                        x={xVal}
+                        y={yVal - 6}
+                        textAnchor="middle"
+                        className="text-[7.5px] fill-amber-900 font-mono font-extrabold"
+                      >
+                        {pct.toFixed(0)}%
+                      </text>
+                    </g>
+                  )
+                })}
+              </svg>
+            </div>
+            <div className="text-[7px] text-slate-400 italic text-center leading-none mt-1">
+              Keterangan Sumbu: Sumbu Kiri = Rencana Progress Mingguan (%), Sumbu Kanan = Rencana Progress Kumulatif (%)
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="text-center border-b border-gray-100 pb-4">
+          <h2 className="text-xl font-bold text-gray-900 tracking-wide font-sans">ANALISIS BOBOT PEKERJAAN & KURVA S JADWAL RENCANA</h2>
+          <p className="text-sm text-gray-600 mt-1">{project?.name} &bull; {project?.location}</p>
+        </div>
+
+        {/* Duration select controls */}
+        <div className="flex flex-wrap items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 no-print text-sm">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-700">Durasi Pelaksanaan Proyek:</span>
+            <select 
+              value={durationWeeks} 
+              onChange={e => handleDurationChange(Number(e.target.value))}
+              className="bg-white border border-gray-300 rounded px-2 py-1 font-bold text-primary-800 focus:outline-none"
+            >
+              <option value={4}>4 Minggu (1 Bulan)</option>
+              <option value={8}>8 Minggu (2 Bulan)</option>
+              <option value={12}>12 Minggu (3 Bulan)</option>
+              <option value={16}>16 Minggu (4 Bulan)</option>
+              <option value={20}>20 Minggu (5 Bulan)</option>
+              <option value={24}>24 Minggu (6 Bulan)</option>
+            </select>
+          </div>
+          <div className="text-xs text-gray-500 italic">
+            * Ubah jadwal mulai dan selesai untuk masing-masing kategori di tabel bawah untuk memperbarui kurva-S secara otomatis.
+          </div>
+        </div>
+
+        {/* Grid Split: Table on Left/Top, Weights Bar Chart on Right */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column: Schedule Setup Table */}
+          <div className="lg:col-span-7 space-y-4">
+            <h3 className="font-bold text-gray-800 text-sm border-l-4 border-primary-600 pl-2">
+              Pengaturan Jadwal Pelaksanaan & Bobot
+            </h3>
+            <table className="w-full text-xs border border-gray-100 rounded-lg overflow-hidden">
+              <thead>
+                <tr className="bg-slate-50 border-b border-gray-200">
+                  <th className="table-header py-2 px-1 w-10 text-center font-bold">No</th>
+                  <th className="table-header py-2 px-2 text-left font-bold">Kategori Pekerjaan</th>
+                  <th className="table-header py-2 px-2 text-right w-28 font-bold">Jumlah Biaya</th>
+                  <th className="table-header py-2 px-2 text-center w-16 font-bold">Bobot (%)</th>
+                  <th className="table-header py-2 px-2 text-center w-40 font-bold no-print">Jadwal Minggu</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {rekapCategories.map((cat, index) => {
+                  const cost = getGroupSubtotal(cat.wbsPath)
+                  const weight = totalPrice > 0 ? (cost / totalPrice) * 100 : 0
+                  const sched = categorySchedules[cat.id] || { startWeek: 1, endWeek: 3 }
+                  
+                  return (
+                    <tr key={cat.id} className="hover:bg-slate-50/50">
+                      <td className="py-2.5 px-1.5 text-center font-mono font-semibold text-slate-400">{index + 1}</td>
+                      <td className="py-2.5 px-2 font-bold text-slate-800 uppercase tracking-wide">{cat.name}</td>
+                      <td className="py-2.5 px-2 text-right font-mono font-semibold text-slate-700">{formatCurrency(cost)}</td>
+                      <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-900">{weight.toFixed(2)}%</td>
+                      <td className="py-2.5 px-2 no-print">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <select
+                            value={sched.startWeek}
+                            onChange={e => {
+                              const start = Number(e.target.value)
+                              const end = Math.max(start, sched.endWeek)
+                              setCategorySchedules(prev => ({
+                                ...prev,
+                                [cat.id]: { startWeek: start, endWeek: end }
+                              }))
+                            }}
+                            className="bg-white border border-gray-200 rounded px-1.5 py-0.5 text-xs text-slate-700"
+                          >
+                            {Array.from({ length: durationWeeks }).map((_, w) => (
+                              <option key={w + 1} value={w + 1}>M{w + 1}</option>
+                            ))}
+                          </select>
+                          <span className="text-gray-400">s/d</span>
+                          <select
+                            value={sched.endWeek}
+                            onChange={e => {
+                              const end = Number(e.target.value)
+                              const start = Math.min(end, sched.startWeek)
+                              setCategorySchedules(prev => ({
+                                ...prev,
+                                [cat.id]: { startWeek: start, endWeek: end }
+                              }))
+                            }}
+                            className="bg-white border border-gray-200 rounded px-1.5 py-0.5 text-xs text-slate-700"
+                          >
+                            {Array.from({ length: durationWeeks }).map((_, w) => (
+                              <option key={w + 1} value={w + 1} disabled={w + 1 < sched.startWeek}>M{w + 1}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                <tr className="font-extrabold bg-slate-50 text-slate-900 border-t border-gray-200">
+                  <td colSpan={2} className="py-2.5 px-2 text-right uppercase">Total Konstruksi (RAB Utama):</td>
+                  <td className="py-2.5 px-2 text-right font-mono">{formatCurrency(totalPrice)}</td>
+                  <td className="py-2.5 px-2 text-center font-mono">100.00%</td>
+                  <td className="py-2.5 px-2 no-print"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Right Column: Weights Horizontal Bar Charts */}
+          <div className="lg:col-span-5 space-y-4">
+            <h3 className="font-bold text-gray-800 text-sm border-l-4 border-teal-600 pl-2">
+              Visualisasi Bobot Kategori Pekerjaan
+            </h3>
+            <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/30 space-y-3.5 max-h-[300px] overflow-y-auto">
+              {rekapCategories.map((cat, index) => {
+                const cost = getGroupSubtotal(cat.wbsPath)
+                const weight = totalPrice > 0 ? (cost / totalPrice) * 100 : 0
+                const colors = ['bg-blue-600', 'bg-teal-600', 'bg-indigo-600', 'bg-violet-600', 'bg-amber-600', 'bg-emerald-600', 'bg-cyan-600']
+                const barColor = colors[index % colors.length]
+                
+                return (
+                  <div key={cat.id} className="space-y-1">
+                    <div className="flex justify-between text-[11px] font-bold text-slate-700 leading-none">
+                      <span className="truncate max-w-[60%]">{cat.name}</span>
+                      <span className="font-mono text-slate-900">{weight.toFixed(2)}% ({formatCurrency(cost)})</span>
+                    </div>
+                    <div className="w-full bg-gray-200/70 rounded-full h-2 overflow-hidden shadow-inner">
+                      <div className={`${barColor} h-full rounded-full transition-all duration-500`} style={{ width: `${weight}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* S-Curve Chart Section */}
+        <div className="space-y-3 pt-2">
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-gray-800 text-sm border-l-4 border-amber-600 pl-2">
+              Grafik Rencana Kemajuan Pekerjaan (Kurva-S)
+            </h3>
+            <div className="flex gap-4 text-xs font-semibold">
+              <span className="flex items-center gap-1.5 text-blue-700">
+                <span className="w-3 h-3 bg-blue-500 opacity-70 rounded-sm inline-block"></span> Rencana Mingguan (%)
+              </span>
+              <span className="flex items-center gap-1.5 text-amber-700">
+                <span className="w-4 h-0.5 bg-amber-600 inline-block relative top-[-1px]"></span>
+                <span className="w-1.5 h-1.5 bg-amber-600 rounded-full inline-block relative left-[-9px]"></span> Rencana Kumulatif (Kurva-S, %)
+              </span>
+            </div>
+          </div>
+
+          {/* SVG Chart Container */}
+          <div className="border border-gray-200 rounded-xl p-4 bg-white flex justify-center shadow-inner overflow-x-auto">
+            <svg width={svgWidth} height={svgHeight} className="font-sans">
+              <defs>
+                <linearGradient id="scurve-gradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+
+              {/* Horizontal Grid lines and Axis Ticks */}
+              {Array.from({ length: 5 }).map((_, i) => {
+                const yVal = padTop + (plotHeight * i) / 4
+                const cumPct = 100 - i * 25
+                const weekPct = (leftYAxisMax * (4 - i)) / 4
+                return (
+                  <g key={i}>
+                    <line 
+                      x1={padLeft} 
+                      y1={yVal} 
+                      x2={padLeft + plotWidth} 
+                      y2={yVal} 
+                      stroke="#f1f5f9" 
+                      strokeWidth="1" 
+                    />
+                    {/* Left axis (weekly) */}
+                    <text 
+                      x={padLeft - 10} 
+                      y={yVal + 3.5} 
+                      textAnchor="end" 
+                      className="text-[10px] fill-slate-400 font-mono font-bold"
+                    >
+                      {weekPct.toFixed(1)}%
+                    </text>
+                    {/* Right axis (cumulative) */}
+                    <text 
+                      x={padLeft + plotWidth + 10} 
+                      y={yVal + 3.5} 
+                      textAnchor="start" 
+                      className="text-[10px] fill-amber-600 font-mono font-bold"
+                    >
+                      {cumPct}%
+                    </text>
+                  </g>
+                )
+              })}
+
+              {/* Vertical Grid Lines and X axis Labels */}
+              {Array.from({ length: durationWeeks }).map((_, w) => {
+                const xVal = padLeft + (w + 0.5) * (plotWidth / durationWeeks)
+                const xLineVal = padLeft + (w + 1) * (plotWidth / durationWeeks)
+                return (
+                  <g key={w}>
+                    {w < durationWeeks - 1 && (
+                      <line 
+                        x1={xLineVal} 
+                        y1={padTop} 
+                        x2={xLineVal} 
+                        y2={padTop + plotHeight} 
+                        stroke="#f8fafc" 
+                        strokeWidth="1" 
+                        strokeDasharray="3,3"
+                      />
+                    )}
+                    <text 
+                      x={xVal} 
+                      y={padTop + plotHeight + 16} 
+                      textAnchor="middle" 
+                      className="text-[10px] fill-slate-500 font-extrabold font-mono"
+                    >
+                      M{w + 1}
+                    </text>
+                  </g>
+                )
+              })}
+
+              {/* Weekly Progress Bars */}
+              {weeklyProgress.map((prog, w) => {
+                const xCenter = padLeft + (w + 0.5) * (plotWidth / durationWeeks)
+                const barWidth = Math.max(12, (plotWidth / durationWeeks) * 0.45)
+                const barHeight = (prog / leftYAxisMax) * plotHeight
+                const yVal = padTop + plotHeight - barHeight
+                
+                return (
+                  <g key={w} className="group">
+                    <rect
+                      x={xCenter - barWidth / 2}
+                      y={yVal}
+                      width={barWidth}
+                      height={Math.max(0, barHeight)}
+                      fill="#3b82f6"
+                      rx="1.5"
+                      className="opacity-70 group-hover:opacity-90 transition-opacity"
+                    />
+                    <text
+                      x={xCenter}
+                      y={Math.max(padTop + 10, yVal - 4)}
+                      textAnchor="middle"
+                      className="text-[9px] fill-blue-700 font-mono font-bold opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      {prog > 0 ? `${prog.toFixed(1)}%` : ''}
+                    </text>
+                  </g>
+                )
+              })}
+
+              {/* Cumulative S-Curve Area under line */}
+              <path d={areaPath} fill="url(#scurve-gradient)" />
+
+              {/* Cumulative S-Curve Line */}
+              <path
+                d={linePath}
+                fill="none"
+                stroke="#d97706"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+
+              {/* S-Curve Circle Nodes */}
+              {cumulativeProgress.map((pct, w) => {
+                const xVal = padLeft + (w + 0.5) * (plotWidth / durationWeeks)
+                const yVal = padTop + plotHeight - (pct / 100) * plotHeight
+                return (
+                  <g key={w} className="group cursor-pointer">
+                    <circle
+                      cx={xVal}
+                      cy={yVal}
+                      r="4.5"
+                      fill="#d97706"
+                      stroke="#ffffff"
+                      strokeWidth="2.5"
+                      className="group-hover:scale-125 transition-transform"
+                    />
+                    <text
+                      x={xVal}
+                      y={yVal - 8}
+                      textAnchor="middle"
+                      className="text-[9.5px] fill-amber-950 font-mono font-black bg-amber-50/90 px-1.5 py-0.5 border border-amber-200 rounded shadow-sm pointer-events-none"
+                    >
+                      {pct.toFixed(1)}%
+                    </text>
+                  </g>
+                )
+              })}
+            </svg>
+          </div>
+          <div className="flex justify-between items-center text-[11px] text-gray-500 italic px-2">
+            <span>* Arahkan kursor ke titik kurva untuk melihat persentase kumulatif mingguan.</span>
+            <span className="font-semibold text-amber-700">M1 s/d M{durationWeeks} menyatakan Minggu Pelaksanaan</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* Action Header */}
@@ -625,6 +1388,14 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
             }`}
           >
             Preview Backup Volume
+          </button>
+          <button 
+            onClick={() => setPreviewTab('analisis_kurvas')}
+            className={`px-4 py-2 border-b-2 text-sm font-semibold transition-all ${
+              previewTab === 'analisis_kurvas' ? 'border-primary-800 text-primary-800' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📊 Analisis & Kurva S
           </button>
         </div>
 
@@ -1006,6 +1777,8 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
               </div>
             </div>
           )}
+
+          {previewTab === 'analisis_kurvas' && renderAnalisisKurvaS(false)}
         </div>
       </div>
 
@@ -1013,12 +1786,7 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
       <div className="print-only hidden space-y-10 text-slate-800 font-sans leading-relaxed text-[9.5px]">
         {/* SECTION 1: REKAPITULASI */}
         <section className="print-page border-b border-slate-200 pb-8">
-          <div className="text-center border-b-2 border-slate-900 pb-3 mb-5">
-            <h1 className="text-[14px] font-extrabold tracking-widest uppercase text-slate-950">REKAPITULASI RENCANA ANGGARAN BIAYA</h1>
-            <div className="text-[9px] font-medium tracking-widest text-slate-500 uppercase mt-1">
-              Proyek: {project?.name} &bull; Lokasi: {project?.location} &bull; Tahun: {project?.year}
-            </div>
-          </div>
+          {renderPrintHeader("REKAPITULASI RENCANA ANGGARAN BIAYA")}
           <table className="w-full border-collapse border border-slate-300 text-[9.5px] font-sans">
             <thead>
               <tr className="border-b-2 border-slate-900 text-[9px] font-bold uppercase tracking-wider text-slate-950 bg-white">
@@ -1070,16 +1838,12 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
               </tr>
             </tbody>
           </table>
+          {renderPrintFooter()}
         </section>
 
         {/* SECTION 2: RAB */}
         <section className="print-page border-b border-slate-200 pb-8" style={{ pageBreakBefore: 'always' }}>
-          <div className="text-center border-b-2 border-slate-900 pb-3 mb-5">
-            <h1 className="text-[14px] font-extrabold tracking-widest uppercase text-slate-950">RENCANA ANGGARAN BIAYA (RAB)</h1>
-            <div className="text-[9px] font-medium tracking-widest text-slate-500 uppercase mt-1">
-              Proyek: {project?.name} &bull; Lokasi: {project?.location} &bull; Tahun: {project?.year}
-            </div>
-          </div>
+          {renderPrintHeader("RENCANA ANGGARAN BIAYA (RAB)")}
           <table className="w-full border-collapse border border-slate-300 text-[9.5px] font-sans">
             <thead>
               <tr className="border-b-2 border-slate-900 text-[9px] font-bold uppercase tracking-wider text-slate-950 bg-white">
@@ -1100,7 +1864,7 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
                   return (
                     <tr key={item.id} className="bg-slate-50 font-bold text-slate-950 border-b border-slate-300">
                       <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9px]">{item.code}</td>
-                      <td colSpan={4} className="border border-slate-300 py-1.5 px-1.5 uppercase text-[9px] tracking-wide" style={{ paddingLeft: `${level * 12}px` }}>
+                      <td colSpan={4} className="border border-slate-300 py-1.5 px-1.5 uppercase text-[9px] tracking-wide" style={{ paddingLeft: `${6 + level * 12}px` }}>
                         {item.name}
                       </td>
                       <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono font-extrabold text-[9.5px]">
@@ -1123,7 +1887,7 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/20 bg-white">
                       <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9px] text-slate-400">{item.code}</td>
-                      <td className="border border-slate-300 py-1.5 px-1.5 text-slate-800 font-normal leading-tight" style={{ paddingLeft: `${level * 12}px` }}>{item.name}</td>
+                      <td className="border border-slate-300 py-1.5 px-1.5 text-slate-800 font-normal leading-tight" style={{ paddingLeft: `${6 + level * 12}px` }}>{item.name}</td>
                       <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono">{volume}</td>
                       <td className="border border-slate-300 py-1.5 px-1.5 text-center font-medium text-slate-500">{unit || '-'}</td>
                       <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono text-slate-500">{formatCurrency(unitPrice)}</td>
@@ -1164,14 +1928,19 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
               </tr>
             </tbody>
           </table>
+          {renderPrintFooter()}
         </section>
 
-        {/* SECTION 2: LEMBAR ANALISA */}
+        {/* SECTION 3: ANALISIS BOBOT PEKERJAAN & JADWAL KURVA S */}
+        <section className="print-page border-b border-slate-200 pb-8" style={{ pageBreakBefore: 'always' }}>
+          {renderPrintHeader("ANALISIS BOBOT PEKERJAAN & KURVA S JADWAL RENCANA")}
+          {renderAnalisisKurvaS(true)}
+          {renderPrintFooter()}
+        </section>
+
+        {/* SECTION 4: LEMBAR ANALISA */}
         <section className="print-page page-break border-b border-slate-200 pb-8" style={{ pageBreakBefore: 'always' }}>
-          <div className="text-center border-b-2 border-slate-900 pb-3 mb-5">
-            <h1 className="text-[14px] font-extrabold tracking-widest uppercase text-slate-950">LEMBAR ANALISA HARGA SATUAN PEKERJAAN (AHSP)</h1>
-            <div className="text-[9px] font-medium tracking-widest text-slate-500 uppercase mt-1">Proyek: {project?.name}</div>
-          </div>
+          {renderPrintHeader("LEMBAR ANALISA HARGA SATUAN PEKERJAAN (AHSP)")}
           <div className="space-y-6">
             {detailedAhsList.map(data => (
               <div key={data.ahs.id} className="border border-slate-300 p-3 rounded bg-white page-break-inside-avoid">
@@ -1280,14 +2049,12 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
               </div>
             ))}
           </div>
+          {renderPrintFooter()}
         </section>
 
         {/* SECTION 3: BOM */}
         <section className="print-page border-b border-slate-200 pb-8" style={{ pageBreakBefore: 'always' }}>
-          <div className="text-center border-b-2 border-slate-900 pb-3 mb-5">
-            <h1 className="text-[14px] font-extrabold tracking-widest uppercase text-slate-950">BILL OF MATERIAL (BOM) REKAPITULASI</h1>
-            <div className="text-[9px] font-medium tracking-widest text-slate-500 uppercase mt-1">Proyek: {project?.name} &bull; Kebutuhan Kumulatif</div>
-          </div>
+          {renderPrintHeader("BILL OF MATERIAL (BOM) REKAPITULASI")}
           <table className="w-full border-collapse border border-slate-300 text-[9.5px] font-sans">
             <thead>
               <tr className="border-b-2 border-slate-900 text-[9px] font-bold uppercase tracking-wider text-slate-950 bg-white">
@@ -1345,16 +2112,12 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
               </tr>
             </tbody>
           </table>
+          {renderPrintFooter()}
         </section>
 
         {/* SECTION 4: BACKUP VOLUME */}
         <section className="print-page pb-8" style={{ pageBreakBefore: 'always' }}>
-          <div className="text-center border-b-2 border-slate-900 pb-3 mb-5">
-            <h1 className="text-[14px] font-extrabold tracking-widest uppercase text-slate-950">BACKUP PERHITUNGAN VOLUME PEKERJAAN</h1>
-            <div className="text-[9px] font-medium tracking-widest text-slate-500 uppercase mt-1">
-              Proyek: {project?.name} &bull; Lokasi: {project?.location} &bull; Tahun: {project?.year}
-            </div>
-          </div>
+          {renderPrintHeader("BACKUP PERHITUNGAN VOLUME PEKERJAAN")}
           <table className="w-full border-collapse border border-slate-300 text-[9.5px] font-sans">
             <thead>
               <tr className="border-b-2 border-slate-900 text-[9px] font-bold uppercase tracking-wider text-slate-950 bg-white">
@@ -1374,7 +2137,7 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
                   return (
                     <tr key={item.id} className="bg-slate-50 font-bold text-slate-950 border-b border-slate-300">
                       <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9px]">{item.code}</td>
-                      <td colSpan={5} className="border border-slate-300 py-1.5 px-1.5 uppercase text-[9px] tracking-wide" style={{ paddingLeft: `${level * 12}px` }}>
+                      <td colSpan={5} className="border border-slate-300 py-1.5 px-1.5 uppercase text-[9px] tracking-wide" style={{ paddingLeft: `${6 + level * 12}px` }}>
                         {item.name}
                       </td>
                     </tr>
@@ -1398,7 +2161,7 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
                 return (
                   <tr key={item.id} className="bg-white">
                     <td className="border border-slate-300 py-1.5 px-1.5 text-center font-mono text-[9px] text-slate-400">{item.code}</td>
-                    <td className="border border-slate-300 py-1.5 px-1.5 text-slate-800 font-normal leading-tight" style={{ paddingLeft: `${level * 12}px` }}>{item.name}</td>
+                    <td className="border border-slate-300 py-1.5 px-1.5 text-slate-800 font-normal leading-tight" style={{ paddingLeft: `${6 + level * 12}px` }}>{item.name}</td>
                     <td className="border border-slate-300 py-1.5 px-1.5 text-right font-mono">{volume}</td>
                     <td className="border border-slate-300 py-1.5 px-1.5 text-center font-medium text-slate-500">{unit || '-'}</td>
                     <td className="border border-slate-300 py-1.5 px-1.5 text-left font-mono text-[8.5px] whitespace-pre-line leading-normal">
@@ -1410,6 +2173,7 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
               })}
             </tbody>
           </table>
+          {renderPrintFooter()}
         </section>
       </div>
 
@@ -1439,6 +2203,12 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
           table, thead, tbody, tr, th, td {
             background-color: white !important;
             background: white !important;
+          }
+          /* Force compact padding and height on all tables during print */
+          table th, table td {
+            padding-top: 3px !important;
+            padding-bottom: 3px !important;
+            line-height: 1.15 !important;
           }
         }
       `}} />
