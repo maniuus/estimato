@@ -151,7 +151,7 @@ export function AhsAnalisaTab({ projectId }: AhsAnalisaTabProps): React.ReactEle
   }
 
   if (loading && detailedAhsList.length === 0) {
-    return <div className="text-center py-12 text-gray-500">Memproses lembar analisa...</div>
+    return <div className="text-center py-12 text-gray-500 text-sm">Memproses lembar analisa...</div>
   }
 
   if (detailedAhsList.length === 0) {
@@ -163,15 +163,15 @@ export function AhsAnalisaTab({ projectId }: AhsAnalisaTabProps): React.ReactEle
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
+    <div className="space-y-4 w-full">
+      <div className="flex justify-between items-center bg-slate-50 p-2.5 px-4 rounded-xl border border-slate-200 gap-3">
         <div>
-          <h3 className="text-lg font-bold text-gray-900 font-sans">Lembar Analisa Harga Satuan Pekerjaan (AHSP)</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Analisis rinci untuk setiap pekerjaan konstruksi yang digunakan dalam proyek. Klik pada kolom <b>Harga Satuan (Rp)</b> untuk mengubah harga khusus proyek ini.</p>
+          <h3 className="text-sm font-bold text-gray-800 font-sans">Lembar Analisa Harga Satuan Pekerjaan (AHSP)</h3>
+          <p className="text-[10px] text-gray-500 mt-0.5">Analisis rinci untuk setiap pekerjaan konstruksi yang digunakan dalam proyek. Klik pada kolom <b>Harga Satuan (Rp)</b> untuk kustomisasi harga.</p>
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {detailedAhsList.map(({
           ahs,
           materials,
@@ -184,53 +184,53 @@ export function AhsAnalisaTab({ projectId }: AhsAnalisaTabProps): React.ReactEle
           overheadAmount,
           totalUnitPrice
         }) => (
-          <div key={ahs.id} className="card overflow-hidden border border-gray-200 shadow-sm">
-            {/* Header */}
-            <div className="bg-primary-900 text-white px-5 py-3 flex justify-between items-center">
+          <div key={ahs.id} className="card overflow-hidden border border-gray-200 shadow-xs bg-white">
+            {/* Header Banner */}
+            <div className="bg-primary-900 text-white px-3 py-1.5 flex justify-between items-center">
               <div>
-                <span className="font-mono text-xs text-primary-200 font-semibold block uppercase tracking-wider">KODE AHS: {ahs.code}</span>
-                <h4 className="text-base font-bold">{ahs.name}</h4>
+                <span className="font-mono text-[9px] text-primary-200 font-semibold block uppercase tracking-wider">KODE AHS: {ahs.code}</span>
+                <h4 className="text-xs font-bold leading-tight">{ahs.name}</h4>
               </div>
               <div className="text-right">
-                <span className="text-[10px] text-primary-200 block uppercase tracking-wider">Harga Satuan (/{ahs.unit})</span>
-                <span className="text-lg font-extrabold font-mono text-amber-300">{formatCurrency(totalUnitPrice)}</span>
+                <span className="text-[9px] text-primary-200 block uppercase tracking-wider">Harga Satuan (/{ahs.unit})</span>
+                <span className="text-sm font-extrabold font-mono text-amber-350">{formatCurrency(totalUnitPrice)}</span>
               </div>
             </div>
 
             {/* Analysis Table */}
-            <table className="w-full text-sm">
+            <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="table-header w-12 text-center">No</th>
-                  <th className="table-header w-2/5 text-left">Uraian Komponen</th>
-                  <th className="table-header w-20 text-center">Satuan</th>
-                  <th className="table-header w-28 text-right">Koefisien</th>
-                  <th className="table-header w-36 text-right">Harga Satuan (Rp)</th>
-                  <th className="table-header w-40 text-right">Jumlah Harga (Rp)</th>
+                <tr className="bg-gray-50 border-b border-gray-250">
+                  <th className="px-2 py-1 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-12 border-b border-gray-200">No</th>
+                  <th className="px-2 py-1 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-2/5 border-b border-gray-200">Uraian Komponen</th>
+                  <th className="px-2 py-1 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-20 border-b border-gray-200">Satuan</th>
+                  <th className="px-2 py-1 text-right text-xs font-bold text-gray-500 uppercase tracking-wider w-28 border-b border-gray-200">Koefisien</th>
+                  <th className="px-2 py-1 text-right text-xs font-bold text-gray-500 uppercase tracking-wider w-36 border-b border-gray-200">Harga Satuan (Rp)</th>
+                  <th className="px-2 py-1 text-right text-xs font-bold text-gray-500 uppercase tracking-wider w-40 border-b border-gray-200">Jumlah Harga (Rp)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {/* A. TENAGA KERJA */}
-                <tr className="bg-blue-50/50 font-bold">
-                  <td className="px-4 py-2 font-mono text-xs text-blue-700">A</td>
-                  <td colSpan={5} className="px-4 py-2 text-xs text-blue-800 uppercase tracking-wider">TENAGA KERJA</td>
+                <tr className="bg-blue-50/40 font-bold">
+                  <td className="px-2 py-0.5 font-mono text-xs text-blue-700">A</td>
+                  <td colSpan={5} className="px-2 py-0.5 text-xs text-blue-800 uppercase tracking-wider">TENAGA KERJA</td>
                 </tr>
                 {wages.length === 0 ? (
-                  <tr>
-                    <td className="px-4 py-2 text-center text-gray-400 font-mono text-xs">-</td>
-                    <td colSpan={5} className="px-4 py-2 text-xs text-gray-400 italic">Tidak ada tenaga kerja</td>
+                  <tr className="bg-white">
+                    <td className="px-2 py-0.5 text-center text-gray-400 font-mono text-xs border-b border-gray-100">-</td>
+                    <td colSpan={5} className="px-2 py-0.5 text-xs text-gray-400 italic border-b border-gray-100">Tidak ada tenaga kerja</td>
                   </tr>
                 ) : (
                   wages.map((w: any, i) => {
                     const isEditing = editingCell?.id === w.id
                     return (
-                      <tr key={w.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-2 text-center text-gray-400 font-mono text-xs">{i + 1}</td>
-                        <td className="px-4 py-2 text-gray-700 font-medium">{w.wageType}</td>
-                        <td className="px-4 py-2 text-center text-gray-600 font-semibold">{w.wageUnit}</td>
-                        <td className="px-4 py-2 text-right font-mono">{w.coefficient.toFixed(4)}</td>
+                      <tr key={w.id} className="hover:bg-gray-50/30 transition-colors bg-white">
+                        <td className="px-2 py-0.5 text-center text-gray-400 font-mono text-xs border-b border-gray-100">{i + 1}</td>
+                        <td className="px-2 py-0.5 text-gray-700 font-medium border-b border-gray-100 text-xs">{w.wageType}</td>
+                        <td className="px-2 py-0.5 text-center text-gray-600 font-semibold border-b border-gray-100 text-xs">{w.wageUnit}</td>
+                        <td className="px-2 py-0.5 text-right font-mono border-b border-gray-100 text-xs">{w.coefficient.toFixed(4)}</td>
                         <td 
-                          className="px-4 py-2 text-right font-mono cursor-pointer hover:bg-amber-50 group transition-colors"
+                          className="px-2 py-0.5 text-right font-mono cursor-pointer hover:bg-amber-50 group transition-colors border-b border-gray-100 text-xs"
                           onClick={() => startEdit(w.id, 'Tenaga Kerja', w.wageId, w.dailyWage)}
                           title="Klik untuk mengubah harga proyek"
                         >
@@ -244,47 +244,47 @@ export function AhsAnalisaTab({ projectId }: AhsAnalisaTabProps): React.ReactEle
                                 if (e.key === 'Enter') handlePriceSubmit(w.wageId, 'Tenaga Kerja')
                                 if (e.key === 'Escape') setEditingCell(null)
                               }}
-                              className="w-28 px-1.5 py-0.5 border border-primary-500 rounded text-right text-xs focus:outline-none"
+                              className="w-24 px-1 py-0.2 border border-primary-500 rounded text-right text-xs focus:outline-none bg-white font-mono"
                               autoFocus
                             />
                           ) : (
                             <span className={w.isOverridden ? "text-blue-600 font-bold flex items-center justify-end gap-1" : "text-gray-700 group-hover:text-primary-600 transition-colors"}>
                               {formatCurrency(w.dailyWage || 0)}
-                              {w.isOverridden === 1 && <span className="text-[10px]" title="Harga kustom proyek">✏️</span>}
+                              {w.isOverridden === 1 && <span className="text-[9px]" title="Harga kustom proyek">✏️</span>}
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-2 text-right font-mono font-medium">{formatCurrency(w.totalPrice || 0)}</td>
+                        <td className="px-2 py-0.5 text-right font-mono font-medium border-b border-gray-100 text-xs">{formatCurrency(w.totalPrice || 0)}</td>
                       </tr>
                     )
                   })
                 )}
-                <tr className="bg-gray-50/50 font-bold text-gray-700">
-                  <td colSpan={5} className="px-4 py-2 text-xs text-right uppercase">Subtotal Tenaga Kerja (A)</td>
-                  <td className="px-4 py-2 text-right font-mono text-blue-800">{formatCurrency(subtotalWages)}</td>
+                <tr className="bg-gray-50/30 font-bold text-gray-700">
+                  <td colSpan={5} className="px-2 py-0.5 text-[10px] text-right uppercase border-b border-gray-100">Subtotal Tenaga Kerja (A)</td>
+                  <td className="px-2 py-0.5 text-right font-mono text-blue-800 border-b border-gray-100 text-xs">{formatCurrency(subtotalWages)}</td>
                 </tr>
 
                 {/* B. BAHAN */}
-                <tr className="bg-green-50/50 font-bold">
-                  <td className="px-4 py-2 font-mono text-xs text-green-700">B</td>
-                  <td colSpan={5} className="px-4 py-2 text-xs text-green-800 uppercase tracking-wider">BAHAN</td>
+                <tr className="bg-green-50/40 font-bold">
+                  <td className="px-2 py-0.5 font-mono text-xs text-green-700">B</td>
+                  <td colSpan={5} className="px-2 py-0.5 text-xs text-green-800 uppercase tracking-wider">BAHAN</td>
                 </tr>
                 {materials.length === 0 ? (
-                  <tr>
-                    <td className="px-4 py-2 text-center text-gray-400 font-mono text-xs">-</td>
-                    <td colSpan={5} className="px-4 py-2 text-xs text-gray-400 italic">Tidak ada bahan</td>
+                  <tr className="bg-white">
+                    <td className="px-2 py-0.5 text-center text-gray-400 font-mono text-xs border-b border-gray-100">-</td>
+                    <td colSpan={5} className="px-2 py-0.5 text-xs text-gray-400 italic border-b border-gray-100">Tidak ada bahan</td>
                   </tr>
                 ) : (
                   materials.map((m: any, i) => {
                     const isEditing = editingCell?.id === m.id
                     return (
-                      <tr key={m.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-2 text-center text-gray-400 font-mono text-xs">{i + 1}</td>
-                        <td className="px-4 py-2 text-gray-700 font-medium">{m.materialName}</td>
-                        <td className="px-4 py-2 text-center text-gray-600 font-semibold">{m.materialUnit}</td>
-                        <td className="px-4 py-2 text-right font-mono">{m.coefficient.toFixed(4)}</td>
+                      <tr key={m.id} className="hover:bg-gray-50/30 transition-colors bg-white">
+                        <td className="px-2 py-0.5 text-center text-gray-400 font-mono text-xs border-b border-gray-100">{i + 1}</td>
+                        <td className="px-2 py-0.5 text-gray-700 font-medium border-b border-gray-100 text-xs">{m.materialName}</td>
+                        <td className="px-2 py-0.5 text-center text-gray-600 font-semibold border-b border-gray-100 text-xs">{m.materialUnit}</td>
+                        <td className="px-2 py-0.5 text-right font-mono border-b border-gray-100 text-xs">{m.coefficient.toFixed(4)}</td>
                         <td 
-                          className="px-4 py-2 text-right font-mono cursor-pointer hover:bg-amber-50 group transition-colors"
+                          className="px-2 py-0.5 text-right font-mono cursor-pointer hover:bg-amber-50 group transition-colors border-b border-gray-100 text-xs"
                           onClick={() => startEdit(m.id, 'Bahan', m.materialId, m.unitPrice)}
                           title="Klik untuk mengubah harga proyek"
                         >
@@ -298,47 +298,47 @@ export function AhsAnalisaTab({ projectId }: AhsAnalisaTabProps): React.ReactEle
                                 if (e.key === 'Enter') handlePriceSubmit(m.materialId, 'Bahan')
                                 if (e.key === 'Escape') setEditingCell(null)
                               }}
-                              className="w-28 px-1.5 py-0.5 border border-primary-500 rounded text-right text-xs focus:outline-none"
+                              className="w-24 px-1 py-0.2 border border-primary-500 rounded text-right text-xs focus:outline-none bg-white font-mono"
                               autoFocus
                             />
                           ) : (
                             <span className={m.isOverridden ? "text-blue-600 font-bold flex items-center justify-end gap-1" : "text-gray-700 group-hover:text-primary-600 transition-colors"}>
                               {formatCurrency(m.unitPrice || 0)}
-                              {m.isOverridden === 1 && <span className="text-[10px]" title="Harga kustom proyek">✏️</span>}
+                              {m.isOverridden === 1 && <span className="text-[9px]" title="Harga kustom proyek">✏️</span>}
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-2 text-right font-mono font-medium">{formatCurrency(m.totalPrice || 0)}</td>
+                        <td className="px-2 py-0.5 text-right font-mono font-medium border-b border-gray-100 text-xs">{formatCurrency(m.totalPrice || 0)}</td>
                       </tr>
                     )
                   })
                 )}
-                <tr className="bg-gray-50/50 font-bold text-gray-700">
-                  <td colSpan={5} className="px-4 py-2 text-xs text-right uppercase">Subtotal Bahan (B)</td>
-                  <td className="px-4 py-2 text-right font-mono text-green-800">{formatCurrency(subtotalMaterials)}</td>
+                <tr className="bg-gray-50/30 font-bold text-gray-700">
+                  <td colSpan={5} className="px-2 py-0.5 text-[10px] text-right uppercase border-b border-gray-100">Subtotal Bahan (B)</td>
+                  <td className="px-2 py-0.5 text-right font-mono text-green-800 border-b border-gray-100 text-xs">{formatCurrency(subtotalMaterials)}</td>
                 </tr>
 
                 {/* C. ALAT */}
-                <tr className="bg-amber-50/50 font-bold">
-                  <td className="px-4 py-2 font-mono text-xs text-amber-700">C</td>
-                  <td colSpan={5} className="px-4 py-2 text-xs text-amber-800 uppercase tracking-wider">ALAT</td>
+                <tr className="bg-amber-50/40 font-bold">
+                  <td className="px-2 py-0.5 font-mono text-xs text-amber-700">C</td>
+                  <td colSpan={5} className="px-2 py-0.5 text-xs text-amber-800 uppercase tracking-wider">ALAT</td>
                 </tr>
                 {equipment.length === 0 ? (
-                  <tr>
-                    <td className="px-4 py-2 text-center text-gray-400 font-mono text-xs">-</td>
-                    <td colSpan={5} className="px-4 py-2 text-xs text-gray-400 italic">Tidak ada alat</td>
+                  <tr className="bg-white">
+                    <td className="px-2 py-0.5 text-center text-gray-400 font-mono text-xs border-b border-gray-100">-</td>
+                    <td colSpan={5} className="px-2 py-0.5 text-xs text-gray-400 italic border-b border-gray-100">Tidak ada alat</td>
                   </tr>
                 ) : (
                   equipment.map((e: any, i) => {
                     const isEditing = editingCell?.id === e.id
                     return (
-                      <tr key={e.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-2 text-center text-gray-400 font-mono text-xs">{i + 1}</td>
-                        <td className="px-4 py-2 text-gray-700 font-medium">{e.equipmentName}</td>
-                        <td className="px-4 py-2 text-center text-gray-600 font-semibold">{e.equipmentUnit}</td>
-                        <td className="px-4 py-2 text-right font-mono">{e.coefficient.toFixed(4)}</td>
+                      <tr key={e.id} className="hover:bg-gray-50/30 transition-colors bg-white">
+                        <td className="px-2 py-0.5 text-center text-gray-400 font-mono text-xs border-b border-gray-100">{i + 1}</td>
+                        <td className="px-2 py-0.5 text-gray-700 font-medium border-b border-gray-100 text-xs">{e.equipmentName}</td>
+                        <td className="px-2 py-0.5 text-center text-gray-600 font-semibold border-b border-gray-100 text-xs">{e.equipmentUnit}</td>
+                        <td className="px-2 py-0.5 text-right font-mono border-b border-gray-100 text-xs">{e.coefficient.toFixed(4)}</td>
                         <td 
-                          className="px-4 py-2 text-right font-mono cursor-pointer hover:bg-amber-50 group transition-colors"
+                          className="px-2 py-0.5 text-right font-mono cursor-pointer hover:bg-amber-50 group transition-colors border-b border-gray-100 text-xs"
                           onClick={() => startEdit(e.id, 'Alat', e.equipmentId, e.rentalPrice)}
                           title="Klik untuk mengubah harga proyek"
                         >
@@ -352,38 +352,38 @@ export function AhsAnalisaTab({ projectId }: AhsAnalisaTabProps): React.ReactEle
                                 if (evt.key === 'Enter') handlePriceSubmit(e.equipmentId, 'Alat')
                                 if (evt.key === 'Escape') setEditingCell(null)
                               }}
-                              className="w-28 px-1.5 py-0.5 border border-primary-500 rounded text-right text-xs focus:outline-none"
+                              className="w-24 px-1 py-0.2 border border-primary-500 rounded text-right text-xs focus:outline-none bg-white font-mono"
                               autoFocus
                             />
                           ) : (
                             <span className={e.isOverridden ? "text-blue-600 font-bold flex items-center justify-end gap-1" : "text-gray-700 group-hover:text-primary-600 transition-colors"}>
                               {formatCurrency(e.rentalPrice || 0)}
-                              {e.isOverridden === 1 && <span className="text-[10px]" title="Harga kustom proyek">✏️</span>}
+                              {e.isOverridden === 1 && <span className="text-[9px]" title="Harga kustom proyek">✏️</span>}
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-2 text-right font-mono font-medium">{formatCurrency(e.totalPrice || 0)}</td>
+                        <td className="px-2 py-0.5 text-right font-mono font-medium border-b border-gray-100 text-xs">{formatCurrency(e.totalPrice || 0)}</td>
                       </tr>
                     )
                   })
                 )}
-                <tr className="bg-gray-50/50 font-bold text-gray-700">
-                  <td colSpan={5} className="px-4 py-2 text-xs text-right uppercase">Subtotal Alat (C)</td>
-                  <td className="px-4 py-2 text-right font-mono text-amber-800">{formatCurrency(subtotalEquipment)}</td>
+                <tr className="bg-gray-50/30 font-bold text-gray-700">
+                  <td colSpan={5} className="px-2 py-0.5 text-[10px] text-right uppercase border-b border-gray-100">Subtotal Alat (C)</td>
+                  <td className="px-2 py-0.5 text-right font-mono text-amber-800 border-b border-gray-100 text-xs">{formatCurrency(subtotalEquipment)}</td>
                 </tr>
 
                 {/* SUMMARY BLOCK */}
-                <tr className="border-t-2 border-gray-300 font-bold">
-                  <td colSpan={5} className="px-4 py-2 text-xs text-right uppercase tracking-wider">Jumlah Harga Tenaga, Bahan dan Alat (A + B + C)</td>
-                  <td className="px-4 py-2 text-right font-mono text-gray-900">{formatCurrency(totalComponents)}</td>
+                <tr className="border-t border-gray-300 font-bold bg-slate-50/20">
+                  <td colSpan={5} className="px-2 py-0.5 text-[10px] text-right uppercase tracking-wider border-b border-gray-100">Jumlah Harga Tenaga, Bahan dan Alat (A + B + C)</td>
+                  <td className="px-2 py-0.5 text-right font-mono text-gray-900 border-b border-gray-100 text-xs">{formatCurrency(totalComponents)}</td>
                 </tr>
-                <tr className="font-bold text-gray-600">
-                  <td colSpan={5} className="px-4 py-2 text-xs text-right uppercase tracking-wider">Overhead & Profit ({overhead}%)</td>
-                  <td className="px-4 py-2 text-right font-mono">{formatCurrency(overheadAmount)}</td>
+                <tr className="font-bold text-gray-605 bg-slate-50/20">
+                  <td colSpan={5} className="px-2 py-0.5 text-[10px] text-right uppercase tracking-wider border-b border-gray-100">Overhead & Profit ({overhead}%)</td>
+                  <td className="px-2 py-0.5 text-right font-mono border-b border-gray-100 text-xs">{formatCurrency(overheadAmount)}</td>
                 </tr>
-                <tr className="bg-amber-100/50 font-extrabold text-primary-900 border-t-2 border-primary-300 text-base">
-                  <td colSpan={5} className="px-4 py-3 text-xs text-right uppercase tracking-wider">Harga Satuan Pekerjaan (HSP)</td>
-                  <td className="px-4 py-3 text-right font-mono text-lg">{formatCurrency(totalUnitPrice)}</td>
+                <tr className="bg-amber-100/35 font-extrabold text-primary-900 border-t border-primary-200">
+                  <td colSpan={5} className="px-2 py-1 text-[10px] text-right uppercase tracking-wider">Harga Satuan Pekerjaan (HSP)</td>
+                  <td className="px-2 py-1 text-right font-mono text-sm">{formatCurrency(totalUnitPrice)}</td>
                 </tr>
               </tbody>
             </table>

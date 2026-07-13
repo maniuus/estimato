@@ -153,6 +153,80 @@ export const evaluateProjectVolumes = (volumes: ProjectVolume[]): ProjectVolume[
               changed = true
             }
           }
+        } else if (parsed.type === 'structural_profile') {
+          const segments = parsed.segments || []
+          const totalL = segments.reduce((sum: number, seg: any) => sum + (parseFloat(seg.length) || 0), 0)
+          const b = parseFloat(parsed.b) || 0
+          const h = parseFloat(parsed.h) || 0
+          const betonVolume = (b / 1000) * (h / 1000) * totalL
+          
+          if (Math.abs(vol.value - betonVolume) > 0.0001) {
+            vol.value = betonVolume
+            changed = true
+          }
+        } else if (parsed.type === 'structural_group') {
+          const profileIds = parsed.profileIds || []
+          let totalBeton = 0
+          
+          profileIds.forEach((pid: string) => {
+            const profVar = resolved.find(v => v.id === pid)
+            if (profVar && profVar.formula) {
+              try {
+                const profData = JSON.parse(profVar.formula)
+                if (profData.type === 'structural_profile') {
+                  const segments = profData.segments || []
+                  const totalL = segments.reduce((sum: number, seg: any) => sum + (parseFloat(seg.length) || 0), 0)
+                  const b = parseFloat(profData.b) || 0
+                  const h = parseFloat(profData.h) || 0
+                  totalBeton += (b / 1000) * (h / 1000) * totalL
+                }
+              } catch {}
+            }
+          })
+          
+          if (Math.abs(vol.value - totalBeton) > 0.0001) {
+            vol.value = totalBeton
+            changed = true
+          }
+        } else if (parsed.type === 'wall_area') {
+          const walls = parsed.walls || []
+          let totalArea = 0
+          
+          walls.forEach((wall: any) => {
+            const length = parseFloat(wall.length) || 0
+            const height = parseFloat(wall.height) || 0
+            const gross = length * height
+            
+            let openingSum = 0
+            const openings = wall.openings || []
+            openings.forEach((op: any) => {
+              const opW = parseFloat(op.w) || 0
+              const opH = parseFloat(op.h) || 0
+              const opQty = parseFloat(op.qty) || 0
+              openingSum += opW * opH * opQty
+            })
+            
+            totalArea += Math.max(0, gross - openingSum)
+          })
+          
+          if (Math.abs(vol.value - totalArea) > 0.0001) {
+            vol.value = totalArea
+            changed = true
+          }
+        } else if (parsed.type === 'room_area') {
+          const rooms = parsed.rooms || []
+          let totalArea = 0
+          
+          rooms.forEach((room: any) => {
+            const length = parseFloat(room.length) || 0
+            const width = parseFloat(room.width) || 0
+            totalArea += length * width
+          })
+          
+          if (Math.abs(vol.value - totalArea) > 0.0001) {
+            vol.value = totalArea
+            changed = true
+          }
         }
       } catch {
         // ignore
@@ -184,5 +258,175 @@ export const evaluateMath = (str: string, projectVolumes: ProjectVolume[]): numb
     return typeof val === 'number' && !isNaN(val) ? val : 0
   } catch {
     return 0
+  }
+}
+
+export const getProfileSteelWeights = (parsed: any, totalL: number) => {
+  const b = parseFloat(parsed.b) || 0
+  const h = parseFloat(parsed.h) || 0
+  const c = parseFloat(parsed.c) || 0
+  const len = totalL
+  const eqty = 1
+
+  let ulirWeight = 0
+  let polosWeight = 0
+
+  const mainRows = parsed.mainRebarRows || []
+  mainRows.forEach((row: any) => {
+    const qty = parseFloat(row.qty) || 0
+    const w = getSteelWeightPerMeter(row.diameter)
+    const weight = qty * len * w * eqty
+    if (row.diameter.toUpperCase().startsWith('D')) {
+      ulirWeight += weight
+    } else {
+      polosWeight += weight
+    }
+  })
+
+  // Sengkang
+  const { size: dStirrup } = parseDiameter(parsed.stirrupDia)
+  const stirrupLengthMm = (b > 2 * c && h > 2 * c) 
+    ? 2 * (b - 2 * c) + 2 * (h - 2 * c) + 12 * dStirrup
+    : 0
+  const stirrupLengthM = stirrupLengthMm / 1000
+
+  let stirrupCount = 0
+  if (parsed.stirrupMode === 'split') {
+    const sTumpuan = parseFloat(parsed.stirrupSpacingTumpuan) || 100
+    const sLapangan = parseFloat(parsed.stirrupSpacingLapangan) || 150
+    const countTumpuan = (sTumpuan > 0 && len > 0) ? Math.floor(((len / 2) * 1000) / sTumpuan) : 0
+    const countLapangan = (sLapangan > 0 && len > 0) ? Math.floor(((len / 2) * 1000) / sLapangan) : 0
+    stirrupCount = countTumpuan + countLapangan + 1
+  } else {
+    const spacing = parseFloat(parsed.stirrupSpacing) || 150
+    stirrupCount = (spacing > 0 && len > 0) ? Math.floor((len * 1000) / spacing) + 1 : 0
+  }
+
+  const stirrupUnitWeight = 0.006165 * dStirrup * dStirrup
+  const stirrupWeight = stirrupCount * stirrupLengthM * stirrupUnitWeight * eqty
+
+  if (parsed.stirrupDia.toUpperCase().startsWith('D')) {
+    ulirWeight += stirrupWeight
+  } else {
+    polosWeight += stirrupWeight
+  }
+
+  return {
+    ulirWeight,
+    polosWeight
+  }
+}
+
+export const resolveLinkedVolume = (
+  vol: { projectVolumeId: string | null; volume: number; formula?: string | null },
+  projectVolumes: ProjectVolume[]
+): number => {
+  if (!vol.projectVolumeId) return vol.volume
+  const pv = projectVolumes.find(p => p.id === vol.projectVolumeId)
+  if (!pv) return vol.volume
+
+  if (pv.formula && pv.formula.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(pv.formula)
+      if (parsed.type === 'structural_group') {
+        const profileIds = parsed.profileIds || []
+        let total = 0
+        
+        profileIds.forEach((pid: string) => {
+          const profVar = projectVolumes.find(v => v.id === pid)
+          if (profVar && profVar.formula) {
+            try {
+              const profData = JSON.parse(profVar.formula)
+              if (profData.type === 'structural_profile') {
+                const segments = profData.segments || []
+                const totalL = segments.reduce((sum: number, seg: any) => sum + (parseFloat(seg.length) || 0), 0)
+                
+                if (vol.formula === 'besi') {
+                  const w = getProfileSteelWeights(profData, totalL)
+                  total += w.ulirWeight + w.polosWeight
+                } else {
+                  const b = parseFloat(profData.b) || 0
+                  const h = parseFloat(profData.h) || 0
+                  total += (b / 1000) * (h / 1000) * totalL
+                }
+              }
+            } catch {}
+          }
+        })
+        return total
+      } else if (parsed.type === 'structural_profile') {
+        const segments = parsed.segments || []
+        const totalL = segments.reduce((sum: number, seg: any) => sum + (parseFloat(seg.length) || 0), 0)
+        
+        if (vol.formula === 'besi') {
+          const w = getProfileSteelWeights(parsed, totalL)
+          return w.ulirWeight + w.polosWeight
+        }
+        
+        // Default is beton volume
+        const b = parseFloat(parsed.b) || 0
+        const h = parseFloat(parsed.h) || 0
+        return (b / 1000) * (h / 1000) * totalL
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return pv.value
+}
+
+export function parseFormulaToText(formulaJson: string): string {
+  if (!formulaJson) return ''
+  try {
+    const data = JSON.parse(formulaJson)
+    if (data.type === 'dimensions') {
+      const rows = data.rows || []
+      return rows
+        .map((r: any) => {
+          const l = parseFloat(r.length) || 0
+          const w = parseFloat(r.width) || 0
+          const h = parseFloat(r.height) || 0
+          const q = parseFloat(r.qty) || 0
+          const dimensions = [
+            l > 0 ? `${l}m (P)` : '',
+            w > 0 ? `${w}m (L)` : '',
+            h > 0 ? `${h}m (T)` : ''
+          ].filter(Boolean).join(' x ')
+          return `${r.description ? `[${r.description}] ` : ''}${dimensions} x ${q}x = ${((l || 1) * (w || 1) * (h || 1) * q).toFixed(3)}`
+        })
+        .join('\n')
+    }
+    if (data.type === 'steel') {
+      const rows = data.rows || []
+      const mode = data.mode || 'table'
+      if (mode === 'table') {
+        return rows
+          .map((r: any) => {
+            const l = parseFloat(r.length) || 0
+            const q = parseFloat(r.qty) || 0
+            const m = parseFloat(r.mult) || 1
+            const weightPerMeter = 0.006165 * Math.pow(parseFloat(r.diameter.replace(/[^\d.]/g, '')) || 0, 2)
+            const rowWeight = l * q * m * weightPerMeter
+            return `${r.description ? `[${r.description}] ` : ''}${r.diameter} L=${l}m x Qty=${q} x Mult=${m} = ${rowWeight.toFixed(2)} kg`
+          })
+          .join('\n')
+      }
+      return `Kalkulator Besi (Section Mode): ${rows.length} Elemen`
+    }
+    if (data.type === 'wall') {
+      const rows = data.rows || []
+      return rows
+        .map((r: any) => {
+          const l = parseFloat(r.length) || 0
+          const h = parseFloat(r.height) || 0
+          const area = l * h
+          return `${r.description ? `[${r.description}] ` : ''}Tebal=${r.thickness || ''} L=${l}m x T=${h}m = ${area.toFixed(2)} m²`
+        })
+        .join('\n')
+    }
+    return String(formulaJson)
+  } catch (e) {
+    return String(formulaJson)
   }
 }

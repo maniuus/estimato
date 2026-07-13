@@ -24,10 +24,10 @@ export function ProjectList({ onSelectProject }: ProjectListProps): React.ReactE
   }
 
   return (
-    <div className="card overflow-hidden">
-      <table className="w-full">
+    <div className="card overflow-hidden border border-slate-100 shadow-sm">
+      <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-gray-200 bg-gray-50">
+          <tr className="border-b border-slate-100 bg-slate-50/50">
             <th className="table-header">Nama Proyek</th>
             <th className="table-header">Lokasi</th>
             <th className="table-header">Tahun</th>
@@ -47,14 +47,14 @@ export function ProjectList({ onSelectProject }: ProjectListProps): React.ReactE
               <tr
                 key={project.id}
                 onClick={() => onSelectProject(project.id)}
-                className="border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors"
+                className="border-b border-slate-50 hover:bg-slate-50/80 cursor-pointer transition-all duration-150 group"
               >
-                <td className="table-cell font-medium text-gray-900">{project.name}</td>
-                <td className="table-cell">{project.location}</td>
-                <td className="table-cell">{project.year}</td>
-                <td className="table-cell font-mono">{formatCurrency(project.grandTotal ?? 0)}</td>
+                <td className="table-cell font-bold text-slate-800 group-hover:text-primary-600 transition-colors">{project.name}</td>
+                <td className="table-cell font-medium text-slate-600">{project.location}</td>
+                <td className="table-cell text-slate-500 font-medium">{project.year}</td>
+                <td className="table-cell font-mono font-bold text-slate-700">{formatCurrency(project.grandTotal ?? 0)}</td>
                 <td className="table-cell">
-                  <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[project.status]}`}>
+                  <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide ${STATUS_COLORS[project.status]}`}>
                     {STATUS_LABELS[project.status]}
                   </span>
                 </td>

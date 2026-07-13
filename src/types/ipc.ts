@@ -1,4 +1,4 @@
-import type { ServiceResult, Project, Material, Wage, Equipment, WbsItem, Ahs, AhsComponentMaterial, AhsComponentWage, AhsComponentEquipment, VolumeItem, RabSnapshot, AppSetting } from '../types/models'
+import type { ServiceResult, Project, Material, Wage, Equipment, WbsItem, Ahs, AhsComponentMaterial, AhsComponentWage, AhsComponentEquipment, VolumeItem, ProjectVolume, RabSnapshot, AppSetting } from '../types/models'
 
 interface ElectronApi {
   invoke(channel: string, ...args: unknown[]): Promise<unknown>

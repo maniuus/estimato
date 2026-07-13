@@ -214,7 +214,7 @@ export function BomTab({ projectId }: BomTabProps): React.ReactElement {
   const grandTotalBOM = filteredBom.reduce((sum, item) => sum + item.totalPrice, 0)
 
   if (loading && bomItems.length === 0) {
-    return <div className="text-center py-12 text-gray-500">Memproses Bill of Material (BOM)...</div>
+    return <div className="text-center py-12 text-gray-500 text-sm">Memproses Bill of Material (BOM)...</div>
   }
 
   if (bomItems.length === 0) {
@@ -226,18 +226,18 @@ export function BomTab({ projectId }: BomTabProps): React.ReactElement {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-3.5">
+      <div className="flex justify-between items-center bg-slate-50 p-2.5 px-4 rounded-xl border border-slate-200 gap-3">
         <div>
-          <h3 className="text-lg font-bold text-gray-900 font-sans">Bill of Material (BOM) Dinamis</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Rangkuman total kebutuhan riil material, upah tenaga, dan peralatan dari seluruh pekerjaan proyek. Klik pada kolom <b>Harga Satuan</b> untuk mengubah harga khusus proyek.</p>
+          <h3 className="text-sm font-bold text-gray-800 font-sans">Bill of Material (BOM) Dinamis</h3>
+          <p className="text-[10px] text-gray-500 mt-0.5">Rangkuman total kebutuhan riil material, upah tenaga, dan peralatan dari seluruh pekerjaan proyek. Klik kolom <b>Harga Satuan</b> untuk kustomisasi harga.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <label className="text-xs text-gray-600 font-medium">Filter Kategori:</label>
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] text-gray-600 font-bold uppercase tracking-wider">Filter:</label>
           <select 
             value={categoryFilter} 
             onChange={e => setCategoryFilter(e.target.value)}
-            className="input-field py-1 px-3 text-xs w-36"
+            className="input-field py-0.5 px-2 text-[11px] w-32 border border-slate-250 bg-white rounded-lg focus:outline-none"
           >
             <option value="all">Semua Kategori</option>
             <option value="Bahan">Bahan</option>
@@ -247,29 +247,29 @@ export function BomTab({ projectId }: BomTabProps): React.ReactElement {
         </div>
       </div>
 
-      <div className="card min-h-[550px] flex flex-col justify-between overflow-hidden">
-        <div className="overflow-x-auto flex-1">
-          <table className="w-full text-sm">
+      <div className="card overflow-hidden bg-white">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="table-header w-12 text-center">No</th>
-                <th className="table-header w-2/5 text-left">Uraian Komponen</th>
-                <th className="table-header w-32 text-left">Kategori</th>
-                <th className="table-header w-24 text-center">Satuan</th>
-                <th className="table-header w-36 text-right">Total Kebutuhan</th>
-                <th className="table-header w-36 text-right">Harga Satuan</th>
-                <th className="table-header w-40 text-right">Jumlah Biaya</th>
+              <tr className="bg-gray-50 border-b border-gray-250">
+                <th className="px-2 py-1.5 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-12">No</th>
+                <th className="px-2 py-1.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-2/5">Uraian Komponen</th>
+                <th className="px-2 py-1.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-32">Kategori</th>
+                <th className="px-2 py-1.5 text-center text-xs font-bold text-gray-500 uppercase tracking-wider w-24">Satuan</th>
+                <th className="px-2 py-1.5 text-right text-xs font-bold text-gray-500 uppercase tracking-wider w-36">Total Kebutuhan</th>
+                <th className="px-2 py-1.5 text-right text-xs font-bold text-gray-500 uppercase tracking-wider w-36">Harga Satuan</th>
+                <th className="px-2 py-1.5 text-right text-xs font-bold text-gray-500 uppercase tracking-wider w-40">Jumlah Biaya</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filteredBom.map((item, index) => {
                 const isEditing = editingCellId === item.id
                 return (
-                  <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="table-cell text-center text-gray-400 font-mono text-xs">{index + 1}</td>
-                    <td className="table-cell font-medium text-gray-800">{item.name}</td>
-                    <td className="table-cell text-left">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  <tr key={item.id} className="hover:bg-gray-50/30 transition-colors">
+                    <td className="px-2 py-1 text-center text-gray-400 font-mono text-xs border-b border-gray-100">{index + 1}</td>
+                    <td className="px-2 py-1 font-semibold text-gray-800 border-b border-gray-100 text-xs">{item.name}</td>
+                    <td className="px-2 py-1 text-left border-b border-gray-100">
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
                         item.category === 'Bahan' 
                           ? 'bg-green-100 text-green-700' 
                           : item.category === 'Tenaga Kerja'
@@ -279,10 +279,10 @@ export function BomTab({ projectId }: BomTabProps): React.ReactElement {
                         {item.category}
                       </span>
                     </td>
-                    <td className="table-cell text-center text-gray-600 font-semibold">{item.unit}</td>
-                    <td className="table-cell text-right font-mono font-medium">{item.quantity.toFixed(4)}</td>
+                    <td className="px-2 py-1 text-center text-gray-600 font-semibold border-b border-gray-100 text-xs">{item.unit}</td>
+                    <td className="px-2 py-1 text-right font-mono font-medium border-b border-gray-100 text-xs">{item.quantity.toFixed(4)}</td>
                     <td 
-                      className="table-cell text-right font-mono cursor-pointer hover:bg-amber-50 group transition-colors"
+                      className="px-2 py-1 text-right font-mono cursor-pointer hover:bg-amber-50 group transition-colors border-b border-gray-100 text-xs"
                       onClick={() => startEdit(item.id, item.unitPrice)}
                       title="Klik untuk mengubah harga proyek"
                     >
@@ -296,17 +296,17 @@ export function BomTab({ projectId }: BomTabProps): React.ReactElement {
                             if (evt.key === 'Enter') handlePriceSubmit(item)
                             if (evt.key === 'Escape') setEditingCellId(null)
                           }}
-                          className="w-28 px-1.5 py-0.5 border border-primary-500 rounded text-right text-xs focus:outline-none"
+                          className="w-24 px-1 py-0.2 border border-primary-500 rounded text-right text-xs focus:outline-none bg-white font-mono"
                           autoFocus
                         />
                       ) : (
                         <span className={item.isOverridden ? "text-blue-600 font-bold flex items-center justify-end gap-1" : "text-gray-600 group-hover:text-primary-600 transition-colors"}>
                           {formatCurrency(item.unitPrice)}
-                          {item.isOverridden === 1 && <span className="text-[10px]" title="Harga kustom proyek">✏️</span>}
+                          {item.isOverridden === 1 && <span className="text-[9px]" title="Harga kustom proyek">✏️</span>}
                         </span>
                       )}
                     </td>
-                    <td className="table-cell text-right font-mono font-bold text-gray-900">{formatCurrency(item.totalPrice)}</td>
+                    <td className="px-2 py-1 text-right font-mono font-bold text-gray-900 border-b border-gray-100 text-xs">{formatCurrency(item.totalPrice)}</td>
                   </tr>
                 )
               })}
@@ -315,11 +315,11 @@ export function BomTab({ projectId }: BomTabProps): React.ReactElement {
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-between items-center">
-          <span className="text-xs text-gray-500 italic">Total Baris Komponen: {filteredBom.length} item</span>
+        <div className="bg-gray-50 px-4 py-2 border-t border-gray-200 flex justify-between items-center shadow-xs">
+          <span className="text-[10px] text-gray-500 italic">Total Baris Komponen: {filteredBom.length} item</span>
           <div className="text-right">
-            <span className="text-xs text-gray-500 font-medium mr-2">Total Biaya Komponen:</span>
-            <span className="text-base font-extrabold text-primary-800 font-mono">{formatCurrency(grandTotalBOM)}</span>
+            <span className="text-[10px] text-gray-500 font-medium mr-2">Total Biaya Komponen:</span>
+            <span className="text-sm font-extrabold text-primary-800 font-mono">{formatCurrency(grandTotalBOM)}</span>
           </div>
         </div>
       </div>

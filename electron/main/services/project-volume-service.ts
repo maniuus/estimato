@@ -15,7 +15,7 @@ export class ProjectVolumeService {
 
   upsert(
     projectId: string,
-    data: Partial<Omit<ProjectVolume, 'id' | 'createdAt' | 'updatedAt' | 'projectId'>>
+    data: Partial<Omit<ProjectVolume, 'createdAt' | 'updatedAt' | 'projectId'>>
   ): ServiceResult<ProjectVolume> {
     try {
       if (data.id) {

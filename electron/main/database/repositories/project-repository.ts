@@ -60,7 +60,7 @@ export class ProjectRepository extends BaseRepository<Project> {
     return this.queryOne<Project>(`SELECT * FROM "Project" WHERE id = @id`, { id })
   }
 
-  override getByStatus(status: Project['status']): Project[] {
+  getByStatus(status: Project['status']): Project[] {
     return this.queryAll<Project>(
       `SELECT * FROM "Project" WHERE status = @status ORDER BY updatedAt DESC`,
       { status }

@@ -229,8 +229,8 @@ export function VolumeCalculatorModal({
     /* Bypass project volume link apply as per user's hold request */
     if (false && currentProjectVolumeId) {
       const matched = loadedProjectVolumes.find(pv => pv.id === currentProjectVolumeId)
-      const val = matched ? matched.value : 0
-      const name = matched ? matched.name : 'Volume Bersama'
+      const val = matched?.value ?? 0
+      const name = matched?.name ?? 'Volume Bersama'
       onApply(parseFloat(val.toFixed(4)), '', `Dihubungkan ke Volume Bersama: ${name}`, currentProjectVolumeId)
       onClose()
       return

@@ -7,6 +7,7 @@ import { ProjectVolumeTab } from './project-volume-tab'
 import { AhsAnalisaTab } from './ahs-analisa-tab'
 import { BomTab } from './bom-tab'
 import { LaporanPage } from './laporan-page'
+import { ArrowLeft, Edit3, Info, ClipboardList, HardHat, Layers, FileSpreadsheet } from 'lucide-react'
 
 interface ProjectDetailPageProps {
   projectId: string
@@ -34,41 +35,63 @@ export function ProjectDetailPage({ projectId, onBack, onEdit }: ProjectDetailPa
   }, [projectId, project?.ppn, project?.overhead])
 
   if (!project) {
-    return <div className="text-center py-8 text-gray-500">Proyek tidak ditemukan</div>
+    return <div className="text-center py-8 text-slate-500 font-medium">Proyek tidak ditemukan</div>
   }
 
-  const tabs: { id: ProjectTab; label: string }[] = [
-    { id: 'info', label: 'Info' },
-    { id: 'rab-input', label: 'Input RAB' },
-    { id: 'ahs-analisa', label: 'Lembar Analisa' },
-    { id: 'bom', label: 'Bill of Material (BOM)' },
-    { id: 'laporan', label: 'Laporan & Ekspor' }
+  const tabs: { id: ProjectTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { id: 'info', label: 'Ringkasan', icon: Info },
+    { id: 'rab-input', label: 'RAB & WBS', icon: ClipboardList },
+    { id: 'ahs-analisa', label: 'Analisa AHS', icon: HardHat },
+    { id: 'bom', label: 'Bahan & Upah (BOM)', icon: Layers },
+    { id: 'laporan', label: 'Laporan & Ekspor', icon: FileSpreadsheet }
   ]
 
   const renderTabContent = (): React.ReactElement => {
     switch (activeTab) {
       case 'info':
         return (
-          <div className="grid grid-cols-3 gap-4">
-            <div className="card p-4">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Informasi Proyek</p>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-500">No. Proyek</span><span className="font-semibold text-gray-800">{project.projectNumber || '-'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Lokasi</span><span className="font-semibold text-gray-800">{project.location || '-'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Tahun</span><span className="font-semibold text-gray-800">{project.year}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Tipe Bangunan</span><span className="font-semibold text-gray-800">{project.buildingType || '-'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Lantai</span><span className="font-semibold text-gray-800">{project.floors} Lantai</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">PPN (%)</span><span className="font-semibold text-gray-800">{project.ppn}%</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Overhead (%)</span><span className="font-semibold text-gray-800">{project.overhead}%</span></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="card p-6 border-slate-100 shadow-sm">
+              <h4 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                <Info className="w-3.5 h-3.5 text-indigo-500" />
+                <span>Informasi Proyek</span>
+              </h4>
+              <div className="space-y-3.5 text-sm">
+                <div className="flex justify-between items-center"><span className="text-slate-500 font-medium">No. Proyek</span><span className="font-semibold text-slate-800">{project.projectNumber || '-'}</span></div>
+                <div className="flex justify-between items-center"><span className="text-slate-500 font-medium">Lokasi</span><span className="font-semibold text-slate-800">{project.location || '-'}</span></div>
+                <div className="flex justify-between items-center"><span className="text-slate-500 font-medium">Tahun Anggaran</span><span className="font-semibold text-slate-800">{project.year}</span></div>
+                <div className="flex justify-between items-center"><span className="text-slate-500 font-medium">Tipe Bangunan</span><span className="font-semibold text-slate-800">{project.buildingType || '-'}</span></div>
+                <div className="flex justify-between items-center"><span className="text-slate-500 font-medium">Jumlah Lantai</span><span className="font-semibold text-slate-800">{project.floors} Lantai</span></div>
+                <div className="flex justify-between items-center border-t border-slate-100 pt-3.5"><span className="text-slate-500 font-medium">PPN (%)</span><span className="font-mono font-bold text-slate-800">{project.ppn}%</span></div>
+                <div className="flex justify-between items-center"><span className="text-slate-500 font-medium">Overhead (%)</span><span className="font-mono font-bold text-slate-800">{project.overhead}%</span></div>
               </div>
             </div>
             
-            <div className="card p-4 col-span-2">
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Rekapitulasi Biaya</p>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-500">Total Pekerjaan</span><span className="font-mono font-bold text-gray-800">{calculation ? calculation.lineItems.length : 0}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span className="font-mono font-bold text-gray-800">{calculation ? formatCurrency(calculation.totalPrice) : '-'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Grand Total</span><span className="font-mono font-extrabold text-primary-800">{calculation ? formatCurrency(calculation.grandTotal) : '-'}</span></div>
+            <div className="card p-6 col-span-2 border-slate-100 shadow-sm flex flex-col justify-between">
+              <div>
+                <h4 className="text-xs text-slate-400 font-bold uppercase tracking-wider mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+                  <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Rekapitulasi Estimasi RAB</span>
+                </h4>
+                <div className="grid grid-cols-2 gap-6 mt-4">
+                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex flex-col justify-center">
+                    <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Total Item Pekerjaan</span>
+                    <span className="text-2xl font-extrabold text-slate-800 mt-1 font-mono">{calculation ? calculation.lineItems.length : 0}</span>
+                  </div>
+                  <div className="p-4 bg-indigo-50/40 rounded-xl border border-indigo-100/50 flex flex-col justify-center">
+                    <span className="text-xs text-indigo-500/80 font-semibold uppercase tracking-wider">Subtotal Biaya</span>
+                    <span className="text-xl font-extrabold text-indigo-900 mt-1 font-mono">{calculation ? formatCurrency(calculation.totalPrice) : '-'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 pt-5 border-t border-slate-100 flex justify-between items-center bg-slate-900 text-white p-5 rounded-xl shadow-inner shadow-black/10">
+                <div className="space-y-0.5">
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Grand Total (Termasuk PPN & OH)</span>
+                  <p className="text-[10px] text-slate-500">Estimasi total biaya perencanaan pembangunan fisik</p>
+                </div>
+                <span className="text-2xl font-black text-indigo-300 tracking-tight font-mono">
+                  {calculation ? formatCurrency(calculation.grandTotal) : '-'}
+                </span>
               </div>
             </div>
           </div>
@@ -93,29 +116,46 @@ export function ProjectDetailPage({ projectId, onBack, onEdit }: ProjectDetailPa
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3 no-print">
-        <button onClick={onBack} className="text-gray-500 hover:text-gray-700 text-sm">&larr; Kembali</button>
-        <h2 className="text-2xl font-bold text-gray-900">{project.name}</h2>
-        <span className={`px-3 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[project.status]}`}>
+      <div className="flex items-center gap-3 no-print border-b border-slate-200/50 pb-4">
+        <button 
+          onClick={onBack} 
+          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 transition-all duration-150 active:scale-95"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Kembali</span>
+        </button>
+        <h2 className="text-xl font-extrabold text-slate-800 tracking-tight">{project.name}</h2>
+        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide ${STATUS_COLORS[project.status]}`}>
           {STATUS_LABELS[project.status]}
         </span>
-        <button onClick={onEdit} className="btn-primary ml-auto text-xs px-3 py-1.5">Edit Proyek</button>
+        <button 
+          onClick={onEdit} 
+          className="btn-secondary ml-auto text-xs px-3 py-1.5 flex items-center gap-1.5"
+        >
+          <Edit3 className="w-3.5 h-3.5" />
+          <span>Edit Proyek</span>
+        </button>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit no-print">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'bg-white shadow-sm text-primary-800'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex gap-1.5 bg-slate-100/80 p-1 rounded-xl w-fit no-print border border-slate-200/30">
+        {tabs.map(tab => {
+          const Icon = tab.icon
+          const isSelected = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all duration-200 ${
+                isSelected
+                  ? 'bg-white shadow-sm text-primary-600'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-white/40'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{tab.label}</span>
+            </button>
+          )
+        })}
       </div>
 
       {renderTabContent()}

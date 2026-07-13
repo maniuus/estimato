@@ -386,7 +386,6 @@ export function ProjectVolumeTab({ projectId }: ProjectVolumeTabProps): React.Re
         initialFormula={selectedVolume ? selectedVolume.formula : ''}
         initialNotes={selectedVolume ? selectedVolume.notes : ''}
         unit={selectedVolume ? (localUnits[selectedVolume.id] || selectedVolume.unit) : ''}
-        projectVolumes={resolvedVolumes}
       />
     </div>
   )
