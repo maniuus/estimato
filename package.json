@@ -50,6 +50,11 @@
     "directories": {
       "output": "pre-release-dist"
     },
+    "publish": {
+      "provider": "github",
+      "owner": "maniuus",
+      "repo": "estimato"
+    },
     "files": [
       "out/**/*",
       "resources/**/*"
