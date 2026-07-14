@@ -2,6 +2,7 @@ import type { ServiceResult, Project, Material, Wage, Equipment, WbsItem, Ahs, A
 
 interface ElectronApi {
   invoke(channel: string, ...args: unknown[]): Promise<unknown>
+  openExternal(url: string): Promise<void>
 
   project: {
     getAll: () => Promise<ServiceResult<Project[]>>
@@ -10,6 +11,8 @@ interface ElectronApi {
     update: (id: string, data: unknown) => Promise<ServiceResult<Project | null>>
     delete: (id: string) => Promise<ServiceResult<boolean>>
     getByStatus: (status: string) => Promise<ServiceResult<Project[]>>
+    export: (projectId: string) => Promise<ServiceResult<{ success: boolean; filePath: string }>>
+    import: () => Promise<ServiceResult<{ success: boolean; projectId?: string }>>
   }
 
   material: {
@@ -114,6 +117,11 @@ interface ElectronApi {
     override: (projectId: string, componentId: string, category: 'Bahan' | 'Tenaga Kerja' | 'Alat', price: number) => Promise<ServiceResult<boolean>>
     getOverrides: (projectId: string) => Promise<ServiceResult<any[]>>
     deleteOverride: (projectId: string, componentId: string) => Promise<ServiceResult<boolean>>
+  }
+
+  telemetry: {
+    getUserId: () => Promise<string>
+    sendSignal: (type: string, payload: any) => Promise<void>
   }
 }
 

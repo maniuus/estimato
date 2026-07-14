@@ -207,7 +207,7 @@ export function RabInputTab({ projectId }: RabInputTabProps): React.ReactElement
       </div>
 
       <div className="flex gap-4 items-stretch h-full w-full">
-        <div className="flex-1 card min-h-[500px] flex flex-col justify-between overflow-hidden bg-white border border-slate-100/80 shadow-sm">
+        <div className="flex-1 min-w-0 card min-h-[500px] flex flex-col justify-between overflow-hidden bg-white border border-[#EAEAEA]">
           <div className="overflow-x-auto flex-1">
             <table className="w-full border-collapse">
               <thead>

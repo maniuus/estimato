@@ -11,7 +11,7 @@ export function Layout({ activePage, onNavigate, children }: LayoutProps): React
   return (
     <div className="h-screen w-screen flex overflow-hidden">
       <Sidebar activePage={activePage} onNavigate={onNavigate} />
-      <main className="flex-1 overflow-y-auto bg-slate-50/70">
+      <main className="flex-1 min-w-0 overflow-y-auto bg-[#FBFBFA]">
         <div className="p-8">
           {children}
         </div>

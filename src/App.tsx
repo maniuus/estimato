@@ -7,6 +7,7 @@ import { ProjectDetailPage } from './pages/project-detail-page'
 import { AhsPage } from './pages/ahs-page'
 import { SettingsPage } from './pages/settings-page'
 import { useProjectStore } from './stores/project-store'
+import { telemetryService } from './services/telemetry-service'
 
 type Page = 'dashboard' | 'projects' | 'master-data' | 'materials' | 'wages' | 'equipment' | 'ahs-library' | 'settings'
 
@@ -19,16 +20,19 @@ export default function App(): React.ReactElement {
 
   useEffect(() => {
     loadProjects()
+    telemetryService.initialize()
   }, [])
 
   const handleNavigate = (page: string): void => {
     setActivePage(page as Page)
     setSelectedProjectId(null)
+    telemetryService.sendSignal('page_view', { page })
   }
 
   const handleSelectProject = (id: string): void => {
     setSelectedProjectId(id)
     setActivePage('projects')
+    telemetryService.sendSignal('select_project')
   }
 
   const renderContent = (): React.ReactElement => {

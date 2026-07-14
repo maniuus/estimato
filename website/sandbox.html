@@ -1,0 +1,2148 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Preview Sandbox — Estimato by archiTech</title>
+  <meta name="description" content="Uji coba langsung menyusun WBS, menghitung volume, menganalisa AHS SNI secara terintegrasi di browser Anda.">
+  <link rel="stylesheet" href="./style.css">
+  <style>
+    .sandbox-page {
+      padding: 60px 0 120px 0;
+      min-height: calc(100vh - 200px);
+    }
+    
+    .sandbox-intro {
+      max-width: 680px;
+      margin-bottom: 40px;
+    }
+
+    .sandbox-intro h1 {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 12px;
+    }
+
+    .sandbox-intro p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* Spreadsheet Editor Styles */
+    .wbs-table input[type="number"],
+    .wbs-table input[type="text"],
+    .wbs-table select {
+      width: 100%;
+      border: 1px solid transparent;
+      background: transparent;
+      padding: 6px 8px;
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      border-radius: var(--radius-sm);
+      transition: all 0.15s ease;
+    }
+
+    .wbs-table input[type="number"]:hover,
+    .wbs-table input[type="text"]:hover,
+    .wbs-table select:hover {
+      border-color: var(--border-color);
+      background-color: var(--bg-canvas);
+    }
+
+    .wbs-table input[type="number"]:focus,
+    .wbs-table input[type="text"]:focus,
+    .wbs-table select:focus {
+      border-color: var(--text-primary);
+      background-color: #ffffff;
+      box-shadow: 0 0 0 2px rgba(17,17,17,0.05);
+    }
+
+    .wbs-table tr.wbs-group-row {
+      background-color: var(--bg-canvas);
+      font-weight: 700;
+    }
+
+    .wbs-table tr.wbs-group-row td {
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .recap-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 32px;
+    }
+
+    .recap-card {
+      background-color: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .recap-card .label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .recap-card .value {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .recap-card.grand-total {
+      background-color: var(--text-primary);
+      border-color: var(--text-primary);
+      color: #ffffff;
+    }
+
+    .recap-card.grand-total .label {
+      color: rgba(255,255,255,0.6);
+    }
+
+    .recap-card.grand-total .value {
+      color: #ffffff;
+      font-size: 20px;
+    }
+
+    .settings-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .settings-inline input {
+      width: 60px;
+      padding: 4px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      outline: none;
+    }
+
+    .settings-inline input:focus {
+      border-color: var(--text-primary);
+    }
+
+    /* Tabs Styling */
+    .sandbox-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 12px;
+    }
+
+    .sandbox-tabs button {
+      background-color: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      font-weight: 700;
+      cursor: pointer;
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      transition: all 0.15s ease;
+    }
+
+    .sandbox-tabs button:hover {
+      background-color: var(--border-color);
+      color: var(--text-primary);
+    }
+
+    .sandbox-tabs button.active {
+      background-color: var(--text-primary);
+      color: #ffffff;
+      border-color: var(--text-primary);
+    }
+
+    /* Report Layouts */
+    .report-paper {
+      background: #ffffff;
+      color: #111111;
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .report-header-block {
+      border-bottom: 2px solid #111111;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .report-header-block h2 {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      text-transform: uppercase;
+    }
+
+    .report-header-block p {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .report-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 32px;
+    }
+
+    .report-table th, .report-table td {
+      border: 1px solid #111111;
+      padding: 8px 12px;
+    }
+
+    .report-table th {
+      background-color: #F5F5F5;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 11px;
+      text-align: left;
+    }
+
+    /* AHS Sheet Container */
+    .ahs-sheet-card {
+      border: 1px solid #111111;
+      margin-bottom: 28px;
+      background-color: #ffffff;
+    }
+
+    .ahs-sheet-card .ahs-title {
+      background: #F5F5F5;
+      padding: 12px 16px;
+      font-weight: 800;
+      border-bottom: 1.5px solid #111111;
+      font-size: 13px;
+    }
+
+    .ahs-sub-header {
+      background-color: #FAFAFA;
+      font-weight: 700;
+    }
+
+    /* S-Curve Schedule Grid */
+    .schedule-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 24px;
+      font-size: 12px;
+    }
+
+    .schedule-table th, .schedule-table td {
+      border: 1px solid var(--border-color);
+      padding: 8px;
+      text-align: center;
+    }
+
+    .schedule-table th {
+      background-color: var(--bg-canvas);
+      font-weight: 700;
+    }
+
+    .schedule-table td.left {
+      text-align: left;
+      font-weight: 700;
+    }
+
+    .schedule-table input[type="number"] {
+      width: 50px;
+      text-align: center;
+      padding: 4px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 12px;
+    }
+
+    .schedule-table input[type="number"]:focus {
+      border-color: var(--text-primary);
+      outline: none;
+    }
+
+    .scurve-svg {
+      background-color: var(--bg-canvas);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      margin-top: 24px;
+      display: block;
+      width: 100%;
+      max-width: 700px;
+      height: auto;
+    }
+
+    /* Master Prices Inputs Styles */
+    .price-tweak-box {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background-color: var(--bg-canvas);
+      padding: 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+    }
+    .price-tweak-box label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+    .price-tweak-box input {
+      padding: 4px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      outline: none;
+    }
+    .price-tweak-box input:focus {
+      border-color: var(--text-primary);
+    }
+
+    .badge-ahs {
+      font-size: 10px;
+      font-weight: 700;
+      background-color: #EDF3EC;
+      color: #346538;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #cce3cb;
+    }
+
+    .badge-manual {
+      font-size: 10px;
+      font-weight: 700;
+      background-color: #FFF6E6;
+      color: #B27000;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #FFE4B3;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <header>
+    <div class="container nav-container">
+      <a href="./index.html" class="logo">
+        <div class="logo-box">ES</div>
+        <span class="logo-text">Estimato</span>
+      </a>
+      <nav>
+        <a href="./index.html#features" class="nav-link">Fitur</a>
+        <a href="./docs.html" class="nav-link">Dokumentasi</a>
+        <a href="./sandbox.html" class="nav-link active">Sandbox</a>
+        <a href="#" class="btn btn-primary">Download v1.0.0</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Sandbox Body -->
+  <main class="sandbox-page">
+    <div class="container">
+      
+      <!-- ── VIEW 1: PROJECTS LIST ── -->
+      <div id="view-list" class="view-container">
+        <div class="sandbox-intro">
+          <span class="eyebrow">Uji Coba Di Browser</span>
+          <h1>Daftar Proyek Estimato</h1>
+          <p>Klik nama proyek untuk masuk ke dalam lembar **WBS (Work Breakdown Structure)** dan kelola perhitungan anggaran biaya secara live. Tweak harga material/upah dan saksikan seluruh Analisa AHS, RAB, serta Bill of Material ter-recalculation otomatis secara konsisten!</p>
+        </div>
+
+        <!-- Toggle main dashboard tabs -->
+        <div class="sandbox-tabs" style="margin-top: 16px; margin-bottom: 24px;">
+          <button id="main-tab-projects" class="active" onclick="switchMainTab('projects')">Proyek Anda</button>
+          <button id="main-tab-library" onclick="switchMainTab('library')">Library Master AHSP</button>
+        </div>
+
+        <!-- Panel 1: Projects list -->
+        <div id="panel-projects">
+          <div class="sandbox-card" style="margin-top: 0;">
+            <div class="sandbox-header">
+              <h3>Proyek Anda</h3>
+              <div class="sandbox-actions">
+                <button onclick="showNewProjectForm()" class="btn btn-primary" style="padding: 8px 16px; font-size: 13px;">+ Buat Proyek</button>
+                <button onclick="triggerImport()" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">Load from Local</button>
+                <input type="file" id="file-import" style="display: none;" onchange="handleFileImport(event)" accept=".json">
+              </div>
+            </div>
+
+            <!-- Form (Hidden by default) -->
+            <div id="project-form" class="sandbox-form" style="display: none;">
+              <div class="sandbox-form-group">
+                <label for="form-name">Nama Proyek</label>
+                <input type="text" id="form-name" placeholder="Contoh: Pembangunan Ruko 3 Lantai">
+              </div>
+              <div class="sandbox-form-group">
+                <label for="form-location">Lokasi</label>
+                <input type="text" id="form-location" placeholder="Contoh: Jakarta Pusat">
+              </div>
+              <div class="sandbox-form-group">
+                <label for="form-year">Tahun Anggaran</label>
+                <input type="number" id="form-year" value="2026">
+              </div>
+              <div class="sandbox-form-actions">
+                <button onclick="hideProjectForm()" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Batal</button>
+                <button onclick="saveProjectForm()" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;">Simpan</button>
+              </div>
+            </div>
+
+            <div class="sandbox-table-wrapper">
+              <table class="sandbox-table">
+                <thead>
+                  <tr>
+                    <th>Nama Proyek</th>
+                    <th>Lokasi</th>
+                    <th>Tahun</th>
+                    <th>Estimasi RAB (Grand Total)</th>
+                    <th style="text-align: center; width: 220px;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="sandbox-projects-list">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel 2: Master AHSP Library -->
+        <div id="panel-library" style="display: none;">
+          <div class="sandbox-card" style="margin-top: 0;">
+            <div class="sandbox-header" style="margin-bottom: 16px; display: flex; flex-direction: column; gap: 4px;">
+              <h3>Katalog Master AHSP (SNI)</h3>
+              <p style="font-size: 12.5px; color: var(--text-secondary);">Klik baris analisa untuk memperluas dan melihat detail rincian koefisien, komponen upah/bahan, dan perhitungan harga satuannya.</p>
+            </div>
+
+            <div class="sandbox-table-wrapper">
+              <table class="sandbox-table">
+                <thead>
+                  <tr>
+                    <th style="width: 60px; text-align: center;">No</th>
+                    <th style="width: 140px;">Kode AHS</th>
+                    <th>Uraian Pekerjaan</th>
+                    <th style="width: 100px; text-align: center;">Satuan</th>
+                    <th style="width: 180px; text-align: right;">Harga Satuan Dasar</th>
+                  </tr>
+                </thead>
+                <tbody id="master-ahsp-list">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VIEW 2: DETAIL VIEW ── -->
+      <div id="view-details" class="view-container" style="display: none;">
+        <div class="sandbox-header" style="margin-bottom: 20px;">
+          <div>
+            <button onclick="showListView()" class="btn-icon" style="margin-bottom: 12px;">&larr; Kembali ke Daftar Proyek</button>
+            <h2 id="detail-project-name" style="font-size: 28px; font-weight: 800; letter-spacing: -0.03em;">Nama Proyek</h2>
+            <p id="detail-project-meta" style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Lokasi: Jakarta | Tahun: 2026</p>
+          </div>
+          <div class="sandbox-actions">
+            <button onclick="downloadActiveProjectJson()" class="btn btn-secondary" style="padding: 8px 16px; font-size: 13px;">Save to Local (JSON)</button>
+          </div>
+        </div>
+
+        <!-- Collapsible Component Prices Master -->
+        <details style="background:#ffffff; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:20px; margin-bottom:24px;" open>
+          <summary style="font-weight:800; cursor:pointer; font-size:13px; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.05em;">Master Harga Satuan Dasar (Bahan, Upah, & Alat)</summary>
+          
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 20px;">
+            <!-- Column 1: Bahan -->
+            <div style="border-right: 1px solid var(--border-color); padding-right: 20px;">
+              <h4 style="font-size: 11px; font-weight: 850; text-transform: uppercase; color: var(--text-primary); border-bottom: 1.5px solid #111111; padding-bottom: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <span>Bahan / Material</span>
+                <span class="badge-manual" style="font-size: 9px; padding: 1px 6px;">Bahan</span>
+              </h4>
+              <div id="master-prices-materials" style="display: flex; flex-direction: column; gap: 8px;">
+                <!-- Populated via JS -->
+              </div>
+            </div>
+
+            <!-- Column 2: Upah -->
+            <div style="border-right: 1px solid var(--border-color); padding-right: 20px;">
+              <h4 style="font-size: 11px; font-weight: 850; text-transform: uppercase; color: var(--text-primary); border-bottom: 1.5px solid #111111; padding-bottom: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <span>Upah / Tenaga Kerja</span>
+                <span class="badge-ahs" style="font-size: 9px; padding: 1px 6px;">Upah</span>
+              </h4>
+              <div id="master-prices-wages" style="display: flex; flex-direction: column; gap: 8px;">
+                <!-- Populated via JS -->
+              </div>
+            </div>
+
+            <!-- Column 3: Alat -->
+            <div>
+              <h4 style="font-size: 11px; font-weight: 850; text-transform: uppercase; color: var(--text-primary); border-bottom: 1.5px solid #111111; padding-bottom: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <span>Alat / Peralatan</span>
+                <span style="font-size: 9px; padding: 1px 6px; background-color: #FFF2CC; color: #7F6000; border: 1px solid #FFE599; border-radius: 4px; font-weight: 700;">Alat</span>
+              </h4>
+              <div id="master-prices-equipment" style="display: flex; flex-direction: column; gap: 8px;">
+                <!-- Populated via JS -->
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Detail tabs -->
+        <div class="sandbox-tabs">
+          <button id="tab-wbs" class="active" onclick="switchDetailTab('wbs')">WBS Spreadsheet</button>
+          <button id="tab-reports" onclick="switchDetailTab('reports')">Laporan & Kurva S</button>
+        </div>
+
+        <!-- Tab 1: WBS Spreadsheet Container -->
+        <div id="wbs-editor-container">
+          <div class="sandbox-card" style="padding: 30px; margin-top: 0;">
+            <div class="sandbox-header" style="margin-bottom: 16px;">
+              <h4 style="font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Work Breakdown Structure (WBS) & Volume Sheet</h4>
+              <div class="sandbox-actions">
+                <button onclick="addNewWbsRow('group')" class="btn-icon">+ Kelompok Pekerjaan</button>
+                <button onclick="addNewWbsRow('item')" class="btn-icon">+ Item Pekerjaan</button>
+              </div>
+            </div>
+
+            <div class="sandbox-table-wrapper">
+              <table class="sandbox-table wbs-table">
+                <thead>
+                  <tr>
+                    <th style="width: 50px;">No</th>
+                    <th>Uraian Pekerjaan</th>
+                    <th style="width: 140px;">Analisa AHS</th>
+                    <th style="width: 80px;">Satuan</th>
+                    <th style="width: 110px;">Volume</th>
+                    <th style="width: 180px;">Harga Satuan (Rp)</th>
+                    <th style="width: 180px;">Jumlah Biaya (Rp)</th>
+                    <th style="text-align: center; width: 60px;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="wbs-rows-list">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Recap Grid -->
+            <div class="recap-grid">
+              <div class="recap-card">
+                <span class="label">Subtotal Pekerjaan</span>
+                <span id="recap-subtotal" class="value font-mono">Rp 0</span>
+              </div>
+              <div class="recap-card">
+                <div class="label settings-inline">
+                  <span>PPN</span>
+                  <input type="number" id="settings-ppn" min="0" max="100" onchange="updateTaxSetting('ppn', this.value)">
+                  <span>%</span>
+                </div>
+                <span id="recap-ppn" class="value font-mono">Rp 0</span>
+              </div>
+              <div class="recap-card">
+                <div class="label settings-inline">
+                  <span>Overhead</span>
+                  <input type="number" id="settings-overhead" min="0" max="100" onchange="updateTaxSetting('overhead', this.value)">
+                  <span>%</span>
+                </div>
+                <span id="recap-overhead" class="value font-mono">Rp 0</span>
+              </div>
+              <div class="recap-card grand-total">
+                <span class="label">Grand Total RAB</span>
+                <span id="recap-grandtotal" class="value font-mono">Rp 0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Laporan & Kurva S Container -->
+        <div id="reports-container" style="display: none; display: flex; gap: 24px; align-items: flex-start;">
+          <!-- Left: Report List Selector -->
+          <div style="width: 240px; display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;" class="sandbox-tabs">
+            <button id="report-tab-rekap" class="active" onclick="switchReportTab('rekap')" style="text-align: left; width: 100%; justify-content: flex-start;">1. Rekapitulasi</button>
+            <button id="report-tab-rab" onclick="switchReportTab('rab')" style="text-align: left; width: 100%; justify-content: flex-start;">2. Rincian RAB</button>
+            <button id="report-tab-ahs" onclick="switchReportTab('ahs')" style="text-align: left; width: 100%; justify-content: flex-start;">3. Analisa AHS SNI</button>
+            <button id="report-tab-bom" onclick="switchReportTab('bom')" style="text-align: left; width: 100%; justify-content: flex-start;">4. Bill of Material (BOM)</button>
+            <button id="report-tab-backup" onclick="switchReportTab('backup')" style="text-align: left; width: 100%; justify-content: flex-start;">5. Backup Volume</button>
+            <button id="report-tab-scurve" onclick="switchReportTab('scurve')" style="text-align: left; width: 100%; justify-content: flex-start;">6. Jadwal & Kurva S</button>
+          </div>
+          
+          <!-- Right: Report Document Paper -->
+          <div style="flex: 1; background: #ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 40px; box-shadow: var(--shadow-diffuse); overflow-x: auto;">
+            <div id="report-view-content" class="report-paper">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="container" style="border-top: 1px solid var(--border-color); padding-top: 40px; padding-bottom: 40px; margin-top: 0;">
+    <div class="footer-container">
+      <div>
+        <p>&copy; 2026 archiTech. Hak Cipta Dilindungi.</p>
+      </div>
+      <div>
+        <a href="./docs.html" class="nav-link">Bantuan & Dokumentasi</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Sandbox JS Logic -->
+  <script>
+    let projects = [];
+    let activeProjectId = null;
+    let activeDetailTab = 'wbs'; 
+    let activeReportTab = 'rekap'; 
+    let activeMainTab = 'projects'; // 'projects' | 'library'
+    let expandedMasterAhsId = null; // code string of expanded master AHS 
+
+    // Global Master Components Reference
+    const masterComponents = {
+      'M.01': { name: 'Semen Portland (PCC)', unit: 'zak', category: 'Bahan', defaultPrice: 68000 },
+      'M.02': { name: 'Pasir Beton', unit: 'm³', category: 'Bahan', defaultPrice: 290000 },
+      'M.03': { name: 'Kerikil / Split', unit: 'm³', category: 'Bahan', defaultPrice: 340000 },
+      'M.04': { name: 'Besi Beton Polos Ø10', unit: 'kg', category: 'Bahan', defaultPrice: 15000 },
+      'L.01': { name: 'Pekerja Lapangan', unit: 'OH', category: 'Upah', defaultPrice: 120000 },
+      'L.02': { name: 'Tukang Batu / Kayu', unit: 'OH', category: 'Upah', defaultPrice: 150000 },
+      'L.03': { name: 'Kepala Tukang', unit: 'OH', category: 'Upah', defaultPrice: 175000 },
+      'L.04': { name: 'Mandor Lapangan', unit: 'OH', category: 'Upah', defaultPrice: 190000 },
+      'E.01': { name: 'Alat Bantu Konstruksi', unit: 'ls', category: 'Alat', defaultPrice: 25000 }
+    };
+
+    // AHS SNI Templates
+    const ahsTemplates = {
+      'A.2.2.1.9': {
+        name: 'Pembersihan 1 m² Lapangan dan Perataan',
+        unit: 'm²',
+        components: [
+          { code: 'L.01', coef: 0.100 },
+          { code: 'L.04', coef: 0.010 }
+        ]
+      },
+      'A.2.3.1.1': {
+        name: 'Menggali 1 m³ Tanah Biasa Kedalaman 1m',
+        unit: 'm³',
+        components: [
+          { code: 'L.01', coef: 0.750 },
+          { code: 'L.04', coef: 0.025 }
+        ]
+      },
+      'A.4.1.1.2': {
+        name: 'Membuat 1 m³ Beton Pondasi K-225',
+        unit: 'm³',
+        components: [
+          { code: 'M.01', coef: 8.200 },
+          { code: 'M.02', coef: 0.540 },
+          { code: 'M.03', coef: 0.820 },
+          { code: 'L.01', coef: 1.650 },
+          { code: 'L.02', coef: 0.275 },
+          { code: 'L.03', coef: 0.028 },
+          { code: 'L.04', coef: 0.083 }
+        ]
+      },
+      'A.4.1.1.5': {
+        name: 'Membuat 1 m³ Sloof Beton Bertulang 15/20',
+        unit: 'm³',
+        components: [
+          { code: 'M.01', coef: 9.500 },
+          { code: 'M.02', coef: 0.520 },
+          { code: 'M.03', coef: 0.780 },
+          { code: 'M.04', coef: 125.000 },
+          { code: 'L.01', coef: 2.900 },
+          { code: 'L.02', coef: 0.350 },
+          { code: 'L.03', coef: 0.035 },
+          { code: 'L.04', coef: 0.145 },
+          { code: 'E.01', coef: 1.000 }
+        ]
+      }
+    };
+
+    const defaultProjects = [
+      {
+        id: '1',
+        name: 'Pembangunan Rumah Tinggal 2 Lantai',
+        location: 'Jakarta Selatan',
+        year: 2026,
+        ppn: 11,
+        overhead: 10,
+        componentPrices: {
+          'M.01': 68000,
+          'M.02': 290000,
+          'M.03': 340000,
+          'M.04': 15000,
+          'L.01': 120000,
+          'L.02': 150000,
+          'L.03': 175000,
+          'L.04': 190000,
+          'E.01': 25000
+        },
+        wbsItems: [
+          { id: 'w1', name: '1. PEKERJAAN PERSIAPAN & TANAH', type: 'group', code: '1', level: 0 },
+          { id: 'w2', name: 'Pembersihan Lahan / Site Clearing', type: 'item', code: '1.1', level: 1, unit: 'm²', volume: 150, ahsCode: 'A.2.2.1.9', manualPrice: 0 },
+          { id: 'w3', name: 'Galian Tanah Pondasi', type: 'item', code: '1.2', level: 1, unit: 'm³', volume: 45, ahsCode: 'A.2.3.1.1', manualPrice: 0 },
+          { id: 'w4', name: '2. PEKERJAAN STRUKTUR BETON', type: 'group', code: '2', level: 0 },
+          { id: 'w5', name: 'Beton Pondasi Footplate (K-225)', type: 'item', code: '2.1', level: 1, unit: 'm³', volume: 12, ahsCode: 'A.4.1.1.2', manualPrice: 0 },
+          { id: 'w6', name: 'Sloof Beton 15/20', type: 'item', code: '2.2', level: 1, unit: 'm³', volume: 8.5, ahsCode: 'A.4.1.1.5', manualPrice: 0 }
+        ],
+        schedules: {
+          w1: [50, 50, 0, 0, 0, 0, 0, 0],
+          w4: [0, 0, 20, 30, 30, 20, 0, 0]
+        }
+      },
+      {
+        id: '2',
+        name: 'Renovasi Ruko Sudirman',
+        location: 'Bandung',
+        year: 2026,
+        ppn: 11,
+        overhead: 5,
+        componentPrices: {
+          'M.01': 68000,
+          'M.02': 290000,
+          'M.03': 340000,
+          'M.04': 15000,
+          'L.01': 120000,
+          'L.02': 150000,
+          'L.03': 175000,
+          'L.04': 190000,
+          'E.01': 25000
+        },
+        wbsItems: [
+          { id: 'r1', name: '1. PEKERJAAN BONGKARAN', type: 'group', code: '1', level: 0 },
+          { id: 'r2', name: 'Bongkaran Dinding Sekat Gypsum', type: 'item', code: '1.1', level: 1, unit: 'm²', volume: 80, ahsCode: 'A.2.2.1.9', manualPrice: 0 },
+          { id: 'r3', name: 'Bongkaran Lantai Keramik Lama', type: 'item', code: '1.2', level: 1, unit: 'm²', volume: 120, ahsCode: 'A.2.2.1.9', manualPrice: 0 }
+        ],
+        schedules: {
+          r1: [40, 60, 0, 0, 0, 0, 0, 0]
+        }
+      }
+    ];
+
+    // Helper: Safely get component price with master fallbacks
+    function getComponentPrice(project, code) {
+      if (project && project.componentPrices && project.componentPrices[code] !== undefined) {
+        return Number(project.componentPrices[code]) || 0;
+      }
+      const mc = masterComponents[code];
+      return mc ? mc.defaultPrice : 0;
+    }
+
+    // Helper: Compute WBS Item Unit Price based on linked AHS and project component rates
+    function getItemUnitPrice(item, project) {
+      if (!item.ahsCode || item.ahsCode === 'manual') {
+        return item.manualPrice || 0;
+      }
+      const template = ahsTemplates[item.ahsCode];
+      if (!template) return item.manualPrice || 0;
+
+      let total = 0;
+      template.components.forEach(comp => {
+        const rate = getComponentPrice(project, comp.code);
+        total += comp.coef * rate;
+      });
+      return total;
+    }
+
+    function switchMainTab(tabName) {
+      activeMainTab = tabName;
+      document.getElementById('main-tab-projects').classList.toggle('active', tabName === 'projects');
+      document.getElementById('main-tab-library').classList.toggle('active', tabName === 'library');
+
+      document.getElementById('panel-projects').style.display = tabName === 'projects' ? 'block' : 'none';
+      document.getElementById('panel-library').style.display = tabName === 'library' ? 'block' : 'none';
+
+      if (tabName === 'library') {
+        renderMasterAhspList();
+      } else {
+        renderProjectsList();
+      }
+    }
+
+    function toggleExpandMasterAhs(code) {
+      if (expandedMasterAhsId === code) {
+        expandedMasterAhsId = null;
+      } else {
+        expandedMasterAhsId = code;
+      }
+      renderMasterAhspList();
+    }
+
+    function renderMasterAhspList() {
+      const tbody = document.getElementById('master-ahsp-list');
+      tbody.innerHTML = '';
+
+      let idx = 0;
+      Object.keys(ahsTemplates).forEach(code => {
+        idx++;
+        const template = ahsTemplates[code];
+        
+        // Calculate unit price using the default master components prices
+        let unitPrice = 0;
+        const laborComps = [];
+        const materialComps = [];
+        const equipmentComps = [];
+
+        template.components.forEach(comp => {
+          const mc = masterComponents[comp.code];
+          const rate = mc.defaultPrice;
+          const cost = comp.coef * rate;
+          unitPrice += cost;
+
+          const rowData = {
+            name: mc.name,
+            unit: mc.unit,
+            coef: comp.coef,
+            rate,
+            cost
+          };
+          if (mc.category === 'Upah') laborComps.push(rowData);
+          else if (mc.category === 'Bahan') materialComps.push(rowData);
+          else if (mc.category === 'Alat') equipmentComps.push(rowData);
+        });
+
+        const isExpanded = expandedMasterAhsId === code;
+
+        // Render main row
+        const tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.onclick = () => toggleExpandMasterAhs(code);
+        tr.className = isExpanded ? 'bg-slate-50' : 'hover-bg-canvas';
+        
+        tr.innerHTML = `
+          <td style="text-align: center; font-weight: 700; color: var(--text-secondary);">
+            <span style="font-size: 11px;">${isExpanded ? '▼' : '▶'}</span> ${idx}
+          </td>
+          <td class="font-mono" style="font-weight: 700; color: var(--text-primary);">${code}</td>
+          <td style="font-weight: 700; color: var(--text-primary);">${template.name}</td>
+          <td style="text-align: center; color: var(--text-secondary); font-weight: 700;">${template.unit}</td>
+          <td class="font-mono text-primary-600" style="text-align: right; font-weight: 800; padding-right: 16px;">${formatRupiah(unitPrice)}</td>
+        `;
+        tbody.appendChild(tr);
+
+        // If expanded, render details row
+        if (isExpanded) {
+          const detailTr = document.createElement('tr');
+          detailTr.className = 'bg-slate-50';
+          
+          let componentsRowsHtml = '';
+          
+          if (laborComps.length > 0) {
+            componentsRowsHtml += `<tr class="ahs-sub-header"><td colspan="6">A. TENAGA KERJA</td></tr>`;
+            laborComps.forEach((c, i) => {
+              componentsRowsHtml += `
+                <tr>
+                  <td style="text-align:center;">${i+1}</td>
+                  <td>${c.name}</td>
+                  <td style="text-align:center;">${c.unit}</td>
+                  <td class="font-mono" style="text-align:right;">${c.coef.toFixed(4)}</td>
+                  <td class="font-mono" style="text-align:right;">${formatRupiah(c.rate)}</td>
+                  <td class="font-mono" style="text-align:right; font-weight:700;">${formatRupiah(c.cost)}</td>
+                </tr>
+              `;
+            });
+          }
+          if (materialComps.length > 0) {
+            componentsRowsHtml += `<tr class="ahs-sub-header"><td colspan="6">B. BAHAN / MATERIAL</td></tr>`;
+            materialComps.forEach((c, i) => {
+              componentsRowsHtml += `
+                <tr>
+                  <td style="text-align:center;">${i+1}</td>
+                  <td>${c.name}</td>
+                  <td style="text-align:center;">${c.unit}</td>
+                  <td class="font-mono" style="text-align:right;">${c.coef.toFixed(4)}</td>
+                  <td class="font-mono" style="text-align:right;">${formatRupiah(c.rate)}</td>
+                  <td class="font-mono" style="text-align:right; font-weight:700;">${formatRupiah(c.cost)}</td>
+                </tr>
+              `;
+            });
+          }
+          if (equipmentComps.length > 0) {
+            componentsRowsHtml += `<tr class="ahs-sub-header"><td colspan="6">C. PERALATAN</td></tr>`;
+            equipmentComps.forEach((c, i) => {
+              componentsRowsHtml += `
+                <tr>
+                  <td style="text-align:center;">${i+1}</td>
+                  <td>${c.name}</td>
+                  <td style="text-align:center;">${c.unit}</td>
+                  <td class="font-mono" style="text-align:right;">${c.coef.toFixed(4)}</td>
+                  <td class="font-mono" style="text-align:right;">${formatRupiah(c.rate)}</td>
+                  <td class="font-mono" style="text-align:right; font-weight:700;">${formatRupiah(c.cost)}</td>
+                </tr>
+              `;
+            });
+          }
+
+          detailTr.innerHTML = `
+            <td colspan="5" style="padding: 20px;">
+              <div style="background:#ffffff; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 24px; max-width:800px; margin: 0 auto; box-shadow: var(--shadow-sm);">
+                <div style="font-weight:800; border-bottom:1.5px solid #111111; padding-bottom:8px; margin-bottom:16px; font-size:13px; text-transform:uppercase;">
+                  Rincian Komponen Koefisien & Harga Satuan Analisa (${code})
+                </div>
+                <table class="report-table" style="margin-bottom:0; border:none; width: 100%;">
+                  <thead>
+                    <tr>
+                      <th style="width:50px; text-align:center;">No</th>
+                      <th>Komponen Analisa</th>
+                      <th style="width:80px; text-align:center;">Satuan</th>
+                      <th style="width:100px; text-align:right;">Koefisien</th>
+                      <th style="width:140px; text-align:right;">Harga Satuan (Rp)</th>
+                      <th style="width:160px; text-align:right;">Jumlah Biaya (Rp)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${componentsRowsHtml}
+                    <tr style="background:#F5F5F5; font-weight:800; font-size:13px; border-top:1.5px solid #111111;">
+                      <td colspan="5" style="text-align:right;">Total Harga Satuan Dasar (A + B + C)</td>
+                      <td class="font-mono text-primary-600" style="text-align:right; font-size:13px;">${formatRupiah(unitPrice)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(detailTr);
+        }
+      });
+    }
+
+    // Initialize Page
+    function initSandbox() {
+      const saved = localStorage.getItem('estimato_sandbox_projects_wbs_v5');
+      if (saved) {
+        try {
+          projects = JSON.parse(saved);
+          // Self-heal and fill missing component prices
+          projects.forEach(p => {
+            if (!p.componentPrices) p.componentPrices = {};
+            Object.keys(masterComponents).forEach(code => {
+              if (p.componentPrices[code] === undefined) {
+                p.componentPrices[code] = masterComponents[code].defaultPrice;
+              }
+            });
+          });
+        } catch(e) {
+          projects = [...defaultProjects];
+        }
+      } else {
+        projects = [...defaultProjects];
+        saveToLocalStorage();
+      }
+      renderProjectsList();
+    }
+
+    function saveToLocalStorage() {
+      localStorage.setItem('estimato_sandbox_projects_wbs_v5', JSON.stringify(projects));
+    }
+
+    function formatRupiah(num) {
+      return 'Rp ' + Math.round(num).toLocaleString('id-ID');
+    }
+
+    // Calculate Project Costs dynamically
+    function calculateProjectCosts(project) {
+      let subtotal = 0;
+      project.wbsItems.forEach(item => {
+        if (item.type === 'item') {
+          const uPrice = getItemUnitPrice(item, project);
+          subtotal += (item.volume || 0) * uPrice;
+        }
+      });
+
+      const ppnAmount = subtotal * ((project.ppn || 0) / 100);
+      const overheadAmount = subtotal * ((project.overhead || 0) / 100);
+      const grandTotal = subtotal + ppnAmount + overheadAmount;
+
+      return {
+        subtotal,
+        ppnAmount,
+        overheadAmount,
+        grandTotal
+      };
+    }
+
+    // Render View 1: Projects list
+    function renderProjectsList() {
+      const tbody = document.getElementById('sandbox-projects-list');
+      tbody.innerHTML = '';
+
+      if (projects.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 32px;">Belum ada proyek. Klik "+ Buat Proyek" atau load dari file lokal.</td></tr>`;
+        return;
+      }
+
+      projects.forEach(p => {
+        const costs = calculateProjectCosts(p);
+        const tr = document.createElement('tr');
+        
+        tr.innerHTML = `
+          <td><a href="#" onclick="openProject('${p.id}')" style="font-weight: 700; color: var(--text-primary); text-decoration: none; border-bottom: 1px dotted var(--text-secondary);">${p.name}</a></td>
+          <td style="color: var(--text-secondary);">${p.location}</td>
+          <td>${p.year}</td>
+          <td class="font-mono text-primary-600" style="font-weight: 800;">${formatRupiah(costs.grandTotal)}</td>
+          <td style="text-align: center;">
+            <div style="display: flex; gap: 8px; justify-content: center;">
+              <button onclick="openProject('${p.id}')" class="btn-icon">Buka WBS &rarr;</button>
+              <button onclick="deleteProject('${p.id}')" class="btn-icon btn-danger">Hapus</button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // CRUD: Delete Project
+    function deleteProject(id) {
+      if (confirm('Hapus proyek ini beserta seluruh data WBS, volume, dan AHS-nya?')) {
+        projects = projects.filter(p => p.id !== id);
+        saveToLocalStorage();
+        renderProjectsList();
+      }
+    }
+
+    // CRUD: Add New Project
+    function showNewProjectForm() {
+      document.getElementById('project-form').style.display = 'grid';
+      document.getElementById('form-name').value = '';
+      document.getElementById('form-location').value = '';
+      document.getElementById('form-year').value = '2026';
+    }
+
+    function hideProjectForm() {
+      document.getElementById('project-form').style.display = 'none';
+    }
+
+    function saveProjectForm() {
+      const name = document.getElementById('form-name').value.trim();
+      const location = document.getElementById('form-location').value.trim();
+      const year = Number(document.getElementById('form-year').value) || 2026;
+
+      if (!name) {
+        alert('Nama proyek wajib diisi.');
+        return;
+      }
+
+      const newProj = {
+        id: Date.now().toString(),
+        name,
+        location,
+        year,
+        ppn: 11,
+        overhead: 0,
+        componentPrices: {
+          'M.01': 68000,
+          'M.02': 290000,
+          'M.03': 340000,
+          'M.04': 15000,
+          'L.01': 120000,
+          'L.02': 150000,
+          'L.03': 175000,
+          'L.04': 190000,
+          'E.01': 25000
+        },
+        wbsItems: [
+          { id: 'g' + Date.now(), name: '1. PEKERJAAN PERSIAPAN', type: 'group', code: '1', level: 0 },
+          { id: 'i' + Date.now(), name: 'Pembersihan Lahan / Site Clearing', type: 'item', code: '1.1', level: 1, unit: 'm²', volume: 100, ahsCode: 'A.2.2.1.9', manualPrice: 0 }
+        ],
+        schedules: {}
+      };
+
+      projects.push(newProj);
+      saveToLocalStorage();
+      renderProjectsList();
+      hideProjectForm();
+    }
+
+    // ── VIEW 2: DETAIL VIEW PANEL ──
+    function openProject(id) {
+      activeProjectId = id;
+      const project = projects.find(p => p.id === id);
+      if (!project) return;
+
+      document.getElementById('view-list').style.display = 'none';
+      document.getElementById('view-details').style.display = 'block';
+
+      document.getElementById('detail-project-name').innerText = project.name;
+      document.getElementById('detail-project-meta').innerText = `Lokasi: ${project.location} | Tahun Anggaran: ${project.year}`;
+
+      document.getElementById('settings-ppn').value = project.ppn;
+      document.getElementById('settings-overhead').value = project.overhead;
+
+      renderMasterPricesInputs(project);
+      switchDetailTab('wbs');
+    }
+
+    function showListView() {
+      activeProjectId = null;
+      document.getElementById('view-details').style.display = 'none';
+      document.getElementById('view-list').style.display = 'block';
+      renderProjectsList();
+    }
+
+    // Render Master Prices tweak boxes split into Materials, Wages, and Equipment
+    function renderMasterPricesInputs(project) {
+      const wrapperMaterials = document.getElementById('master-prices-materials');
+      const wrapperWages = document.getElementById('master-prices-wages');
+      const wrapperEquipment = document.getElementById('master-prices-equipment');
+
+      wrapperMaterials.innerHTML = '';
+      wrapperWages.innerHTML = '';
+      wrapperEquipment.innerHTML = '';
+
+      Object.keys(masterComponents).forEach(code => {
+        const mc = masterComponents[code];
+        const val = getComponentPrice(project, code);
+
+        const box = document.createElement('div');
+        box.className = 'price-tweak-box';
+        box.style.flexDirection = 'row';
+        box.style.justifyContent = 'space-between';
+        box.style.alignItems = 'center';
+        box.style.padding = '8px 12px';
+        
+        box.innerHTML = `
+          <label style="margin-bottom:0; font-weight:700; font-size:12px; color: var(--text-primary);">${mc.name} (${mc.unit})</label>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:11px; color:var(--text-secondary); font-weight:700;">Rp</span>
+            <input type="number" value="${val}" onchange="tweakComponentPrice('${code}', this.value)" style="width:110px; text-align:right; font-size:12px; font-weight:700; padding: 4px 6px;">
+          </div>
+        `;
+
+        if (mc.category === 'Bahan') {
+          wrapperMaterials.appendChild(box);
+        } else if (mc.category === 'Upah') {
+          wrapperWages.appendChild(box);
+        } else if (mc.category === 'Alat') {
+          wrapperEquipment.appendChild(box);
+        }
+      });
+    }
+
+    function tweakComponentPrice(code, val) {
+      const project = projects.find(p => p.id === activeProjectId);
+      if (!project) return;
+
+      if (!project.componentPrices) project.componentPrices = {};
+      project.componentPrices[code] = Number(val) || 0;
+      saveToLocalStorage();
+      
+      // Update UI elements depending on this
+      renderMasterPricesInputs(project);
+      if (activeDetailTab === 'wbs') {
+        renderWbsRows();
+      } else {
+        renderReport();
+      }
+    }
+
+    function switchDetailTab(tabName) {
+      activeDetailTab = tabName;
+      document.getElementById('tab-wbs').classList.toggle('active', tabName === 'wbs');
+      document.getElementById('tab-reports').classList.toggle('active', tabName === 'reports');
+
+      document.getElementById('wbs-editor-container').style.display = tabName === 'wbs' ? 'block' : 'none';
+      document.getElementById('reports-container').style.display = tabName === 'reports' ? 'flex' : 'none';
+
+      if (tabName === 'wbs') {
+        renderWbsRows();
+      } else {
+        renderReport();
+      }
+    }
+
+    function switchReportTab(reportName) {
+      activeReportTab = reportName;
+      ['rekap', 'rab', 'ahs', 'bom', 'backup', 'scurve'].forEach(r => {
+        document.getElementById(`report-tab-${r}`).classList.toggle('active', r === reportName);
+      });
+      renderReport();
+    }
+
+    // Render WBS sheet editor table
+    function renderWbsRows() {
+      const project = projects.find(p => p.id === activeProjectId);
+      if (!project) return;
+
+      const tbody = document.getElementById('wbs-rows-list');
+      tbody.innerHTML = '';
+
+      if (project.wbsItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-secondary); padding: 32px;">WBS kosong. Silakan tambahkan Kelompok atau Item baru.</td></tr>`;
+        return;
+      }
+
+      // Re-assign codes based on WBS sorting
+      let groupCount = 0;
+      let itemCount = 0;
+      project.wbsItems.forEach((item) => {
+        if (item.type === 'group') {
+          groupCount++;
+          itemCount = 0;
+          item.code = String(groupCount);
+          item.level = 0;
+        } else {
+          itemCount++;
+          item.code = `${groupCount}.${itemCount}`;
+          item.level = 1;
+        }
+      });
+
+      project.wbsItems.forEach((item) => {
+        const tr = document.createElement('tr');
+        
+        if (item.type === 'group') {
+          tr.className = 'wbs-group-row';
+          
+          let groupSum = 0;
+          let foundGroup = false;
+          for (let k = 0; k < project.wbsItems.length; k++) {
+            const current = project.wbsItems[k];
+            if (current.id === item.id) {
+              foundGroup = true;
+              continue;
+            }
+            if (foundGroup) {
+              if (current.type === 'group') break;
+              const uPrice = getItemUnitPrice(current, project);
+              groupSum += (current.volume || 0) * uPrice;
+            }
+          }
+
+          tr.innerHTML = `
+            <td style="font-weight: 700;">${item.code}</td>
+            <td colspan="5">
+              <input type="text" value="${item.name}" onchange="updateWbsVal('${item.id}', 'name', this.value)" style="font-weight: 700;">
+            </td>
+            <td class="font-mono text-slate-800" style="font-weight: 700; text-align: right; padding-right: 16px;">${formatRupiah(groupSum)}</td>
+            <td style="text-align: center;">
+              <button onclick="deleteWbsRow('${item.id}')" class="btn-icon btn-danger" style="padding: 2px 6px;">&times;</button>
+            </td>
+          `;
+        } else {
+          // Leaf item row
+          const uPrice = getItemUnitPrice(item, project);
+          const totalCost = (item.volume || 0) * uPrice;
+          
+          // Generate select dropdown of AHS templates
+          let ahsOptions = `<option value="manual" ${(!item.ahsCode || item.ahsCode==='manual')?'selected':''}>Manual Input</option>`;
+          Object.keys(ahsTemplates).forEach(code => {
+            ahsOptions += `<option value="${code}" ${(item.ahsCode===code)?'selected':''}>${code}</option>`;
+          });
+
+          const isAhsLinked = (item.ahsCode && item.ahsCode !== 'manual');
+          const priceBadge = isAhsLinked ? `<span class="badge-ahs">AHS</span>` : `<span class="badge-manual">MANUAL</span>`;
+
+          tr.innerHTML = `
+            <td style="color: var(--text-secondary); padding-left: 12px;">${item.code}</td>
+            <td>
+              <input type="text" value="${item.name}" onchange="updateWbsVal('${item.id}', 'name', this.value)">
+            </td>
+            <td>
+              <select onchange="updateWbsVal('${item.id}', 'ahsCode', this.value)" style="font-size:11px; padding: 4px;">
+                ${ahsOptions}
+              </select>
+            </td>
+            <td>
+              <input type="text" value="${item.unit || ''}" onchange="updateWbsVal('${item.id}', 'unit', this.value)">
+            </td>
+            <td>
+              <input type="number" value="${item.volume || 0}" step="any" onchange="updateWbsVal('${item.id}', 'volume', this.value)" style="text-align: right; font-weight: 600;">
+            </td>
+            <td style="position: relative;">
+              <div style="display:flex; align-items:center; gap:4px; padding-right:4px;">
+                <span style="font-size:11px; color:var(--text-secondary); font-weight:700; flex-shrink:0;">Rp</span>
+                <input type="number" value="${Math.round(uPrice)}" onchange="updateWbsVal('${item.id}', 'manualPrice', this.value)" ${isAhsLinked?'disabled':''} style="text-align: right; font-weight: 700; ${isAhsLinked?'color:var(--text-secondary); font-style:italic;':''}">
+                ${priceBadge}
+              </div>
+            </td>
+            <td class="font-mono text-slate-700" style="font-weight: 700; text-align: right; padding-right: 16px;">${formatRupiah(totalCost)}</td>
+            <td style="text-align: center;">
+              <button onclick="deleteWbsRow('${item.id}')" class="btn-icon btn-danger" style="padding: 2px 6px;">&times;</button>
+            </td>
+          `;
+        }
+        tbody.appendChild(tr);
+      });
+
+      // Update Recaps
+      const costs = calculateProjectCosts(project);
+      document.getElementById('recap-subtotal').innerText = formatRupiah(costs.subtotal);
+      document.getElementById('recap-ppn').innerText = formatRupiah(costs.ppnAmount);
+      document.getElementById('recap-overhead').innerText = formatRupiah(costs.overheadAmount);
+      document.getElementById('recap-grandtotal').innerText = formatRupiah(costs.grandTotal);
+    }
+
+    // CRUD: Update WBS Val
+    function updateWbsVal(itemId, field, value) {
+      const project = projects.find(p => p.id === activeProjectId);
+      if (!project) return;
+
+      const item = project.wbsItems.find(i => i.id === itemId);
+      if (!item) return;
+
+      if (field === 'volume' || field === 'manualPrice') {
+        item[field] = Number(value) || 0;
+      } else {
+        item[field] = value;
+        // If they chose an AHS template, pre-populate the unit to match the AHS unit
+        if (field === 'ahsCode' && value !== 'manual') {
+          const t = ahsTemplates[value];
+          if (t) item.unit = t.unit;
+        }
+      }
+
+      saveToLocalStorage();
+      renderWbsRows();
+    }
+
+    // CRUD: Add WBS Row
+    function addNewWbsRow(type) {
+      const project = projects.find(p => p.id === activeProjectId);
+      if (!project) return;
+
+      const newId = 'wbs-' + Date.now();
+      if (type === 'group') {
+        project.wbsItems.push({
+          id: newId,
+          name: 'Kelompok Pekerjaan Baru',
+          type: 'group'
+        });
+      } else {
+        project.wbsItems.push({
+          id: newId,
+          name: 'Pekerjaan Baru',
+          type: 'item',
+          unit: 'm³',
+          volume: 0,
+          ahsCode: 'manual',
+          manualPrice: 150000
+        });
+      }
+
+      saveToLocalStorage();
+      renderWbsRows();
+    }
+
+    // CRUD: Delete WBS Row
+    function deleteWbsRow(id) {
+      const project = projects.find(p => p.id === activeProjectId);
+      if (!project) return;
+
+      project.wbsItems = project.wbsItems.filter(i => i.id !== id);
+      saveToLocalStorage();
+      renderWbsRows();
+    }
+
+    // Settings
+    function updateTaxSetting(field, val) {
+      const project = projects.find(p => p.id === activeProjectId);
+      if (!project) return;
+
+      project[field] = Number(val) || 0;
+      saveToLocalStorage();
+      renderWbsRows();
+    }
+
+    // ── REPORT GENERATOR PANEL ──
+    function renderReport() {
+      const project = projects.find(p => p.id === activeProjectId);
+      if (!project) return;
+
+      const container = document.getElementById('report-view-content');
+      
+      const costs = calculateProjectCosts(project);
+      const headerHtml = `
+        <div class="report-header-block">
+          <h2>Estimasi Rencana Anggaran Biaya (RAB)</h2>
+          <p>Proyek: ${project.name} | Lokasi: ${project.location} | Tahun Anggaran: ${project.year}</p>
+        </div>
+      `;
+
+      if (activeReportTab === 'rekap') {
+        // 1. Rekapitulasi
+        let rowsHtml = '';
+        project.wbsItems.forEach(item => {
+          if (item.type === 'group') {
+            let groupSum = 0;
+            let found = false;
+            project.wbsItems.forEach(child => {
+              if (child.id === item.id) { found = true; return; }
+              if (found) {
+                if (child.type === 'group') { found = false; return; }
+                const uPrice = getItemUnitPrice(child, project);
+                groupSum += (child.volume || 0) * uPrice;
+              }
+            });
+            rowsHtml += `
+              <tr>
+                <td style="font-weight:700;">${item.code}</td>
+                <td style="font-weight:700;">${item.name}</td>
+                <td class="font-mono" style="text-align:right; font-weight:700;">${formatRupiah(groupSum)}</td>
+              </tr>
+            `;
+          }
+        });
+
+        container.innerHTML = `
+          ${headerHtml}
+          <h3 style="font-size:14px; font-weight:800; text-transform:uppercase; margin-bottom:12px;">Lembar Rekapitulasi</h3>
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width:80px;">No</th>
+                <th>Uraian Pekerjaan</th>
+                <th style="width:200px; text-align:right;">Jumlah Biaya (Rp)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+              <tr style="border-top: 2px solid #111111;">
+                <td colspan="2" style="font-weight:700; text-align:right; padding-right:16px;">Subtotal Pekerjaan</td>
+                <td class="font-mono" style="text-align:right; font-weight:700;">${formatRupiah(costs.subtotal)}</td>
+              </tr>
+              <tr>
+                <td colspan="2" style="font-weight:700; text-align:right; padding-right:16px;">PPN (${project.ppn}%)</td>
+                <td class="font-mono" style="text-align:right; font-weight:700;">${formatRupiah(costs.ppnAmount)}</td>
+              </tr>
+              <tr>
+                <td colspan="2" style="font-weight:700; text-align:right; padding-right:16px;">Overhead & Profit (${project.overhead}%)</td>
+                <td class="font-mono" style="text-align:right; font-weight:700;">${formatRupiah(costs.overheadAmount)}</td>
+              </tr>
+              <tr style="background:#F5F5F5; border-top: 2px double #111111;">
+                <td colspan="2" style="font-weight:800; text-align:right; padding-right:16px; font-size:14px;">Grand Total RAB</td>
+                <td class="font-mono text-primary-600" style="text-align:right; font-weight:800; font-size:14px;">${formatRupiah(costs.grandTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+      } 
+      
+      else if (activeReportTab === 'rab') {
+        // 2. RAB Pekerjaan
+        let rowsHtml = '';
+        project.wbsItems.forEach(item => {
+          if (item.type === 'group') {
+            rowsHtml += `
+              <tr style="background:#F5F5F5; font-weight:700;">
+                <td>${item.code}</td>
+                <td colspan="4" style="font-weight:700;">${item.name}</td>
+                <td></td>
+              </tr>
+            `;
+          } else {
+            const uPrice = getItemUnitPrice(item, project);
+            rowsHtml += `
+              <tr>
+                <td>${item.code}</td>
+                <td>${item.name}</td>
+                <td style="text-align:center;">${item.unit || ''}</td>
+                <td class="font-mono" style="text-align:right;">${(item.volume || 0).toLocaleString('id-ID')}</td>
+                <td class="font-mono" style="text-align:right;">${formatRupiah(uPrice)}</td>
+                <td class="font-mono" style="text-align:right; font-weight:700;">${formatRupiah(item.volume * uPrice)}</td>
+              </tr>
+            `;
+          }
+        });
+
+        container.innerHTML = `
+          ${headerHtml}
+          <h3 style="font-size:14px; font-weight:800; text-transform:uppercase; margin-bottom:12px;">Rincian Harga Satuan Pekerjaan</h3>
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width:60px;">No</th>
+                <th>Uraian Pekerjaan</th>
+                <th style="width:80px; text-align:center;">Satuan</th>
+                <th style="width:100px; text-align:right;">Volume</th>
+                <th style="width:160px; text-align:right;">Harga Satuan (Rp)</th>
+                <th style="width:180px; text-align:right;">Jumlah Biaya (Rp)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        `;
+      } 
+      
+      else if (activeReportTab === 'ahs') {
+        // 3. Analisa AHS SNI
+        let ahsHtml = '';
+        project.wbsItems.forEach(item => {
+          if (item.type === 'item' && item.ahsCode && item.ahsCode !== 'manual') {
+            const template = ahsTemplates[item.ahsCode];
+            if (template) {
+              // Group components by category
+              const laborComps = [];
+              const materialComps = [];
+              const equipmentComps = [];
+
+              template.components.forEach(comp => {
+                const mc = masterComponents[comp.code];
+                const rate = project.componentPrices[comp.code] !== undefined ? project.componentPrices[comp.code] : mc.defaultPrice;
+                const cost = comp.coef * rate;
+                const rowData = {
+                  code: comp.code,
+                  name: mc.name,
+                  unit: mc.unit,
+                  coef: comp.coef,
+                  rate,
+                  cost
+                };
+
+                if (mc.category === 'Upah') laborComps.push(rowData);
+                else if (mc.category === 'Bahan') materialComps.push(rowData);
+                else if (mc.category === 'Alat') equipmentComps.push(rowData);
+              });
+
+              let totalLabor = laborComps.reduce((sum, c) => sum + c.cost, 0);
+              let totalMaterial = materialComps.reduce((sum, c) => sum + c.cost, 0);
+              let totalEquipment = equipmentComps.reduce((sum, c) => sum + c.cost, 0);
+              let directCost = totalLabor + totalMaterial + totalEquipment;
+
+              let rowsMarkup = '';
+              
+              // Labor rows
+              rowsMarkup += `<tr class="ahs-sub-header"><td colspan="6">A. TENAGA KERJA</td></tr>`;
+              if (laborComps.length === 0) rowsMarkup += `<tr><td colspan="6" style="text-align:center; color:var(--text-secondary);">Nihil</td></tr>`;
+              laborComps.forEach((c, idx) => {
+                rowsMarkup += `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td>${c.name}</td>
+                    <td style="text-align:center;">${c.unit}</td>
+                    <td class="font-mono" style="text-align:right;">${c.coef.toFixed(4)}</td>
+                    <td class="font-mono" style="text-align:right;">${formatRupiah(c.rate)}</td>
+                    <td class="font-mono" style="text-align:right;">${formatRupiah(c.cost)}</td>
+                  </tr>
+                `;
+              });
+              rowsMarkup += `<tr style="font-weight:700;"><td colspan="5" style="text-align:right;">Jumlah Tenaga Kerja (A)</td><td class="font-mono" style="text-align:right;">${formatRupiah(totalLabor)}</td></tr>`;
+
+              // Material rows
+              rowsMarkup += `<tr class="ahs-sub-header"><td colspan="6">B. BAHAN / MATERIAL</td></tr>`;
+              if (materialComps.length === 0) rowsMarkup += `<tr><td colspan="6" style="text-align:center; color:var(--text-secondary);">Nihil</td></tr>`;
+              materialComps.forEach((c, idx) => {
+                rowsMarkup += `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td>${c.name}</td>
+                    <td style="text-align:center;">${c.unit}</td>
+                    <td class="font-mono" style="text-align:right;">${c.coef.toFixed(4)}</td>
+                    <td class="font-mono" style="text-align:right;">${formatRupiah(c.rate)}</td>
+                    <td class="font-mono" style="text-align:right;">${formatRupiah(c.cost)}</td>
+                  </tr>
+                `;
+              });
+              rowsMarkup += `<tr style="font-weight:700;"><td colspan="5" style="text-align:right;">Jumlah Bahan / Material (B)</td><td class="font-mono" style="text-align:right;">${formatRupiah(totalMaterial)}</td></tr>`;
+
+              // Equipment rows
+              rowsMarkup += `<tr class="ahs-sub-header"><td colspan="6">C. PERALATAN</td></tr>`;
+              if (equipmentComps.length === 0) rowsMarkup += `<tr><td colspan="6" style="text-align:center; color:var(--text-secondary);">Nihil</td></tr>`;
+              equipmentComps.forEach((c, idx) => {
+                rowsMarkup += `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td>${c.name}</td>
+                    <td style="text-align:center;">${c.unit}</td>
+                    <td class="font-mono" style="text-align:right;">${c.coef.toFixed(4)}</td>
+                    <td class="font-mono" style="text-align:right;">${formatRupiah(c.rate)}</td>
+                    <td class="font-mono" style="text-align:right;">${formatRupiah(c.cost)}</td>
+                  </tr>
+                `;
+              });
+              rowsMarkup += `<tr style="font-weight:700;"><td colspan="5" style="text-align:right;">Jumlah Peralatan (C)</td><td class="font-mono" style="text-align:right;">${formatRupiah(totalEquipment)}</td></tr>`;
+
+              ahsHtml += `
+                <div class="ahs-sheet-card">
+                  <div class="ahs-title">Kode AHS: ${item.ahsCode} — ${template.name} (${template.unit})</div>
+                  <table class="report-table" style="margin-bottom:0; border:none;">
+                    <thead>
+                      <tr>
+                        <th style="width:50px;">No</th>
+                        <th>Komponen Analisa</th>
+                        <th style="width:60px; text-align:center;">Satuan</th>
+                        <th style="width:100px; text-align:right;">Koefisien</th>
+                        <th style="width:140px; text-align:right;">Harga Satuan (Rp)</th>
+                        <th style="width:160px; text-align:right;">Jumlah Biaya (Rp)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${rowsMarkup}
+                      <tr style="background:#F5F5F5; font-weight:800; font-size:13px; border-top:1.5px solid #111111;">
+                        <td colspan="5" style="text-align:right;">Total Direct Cost (A + B + C)</td>
+                        <td class="font-mono text-primary-600" style="text-align:right; font-size:13px;">${formatRupiah(directCost)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              `;
+            }
+          }
+        });
+
+        container.innerHTML = `
+          ${headerHtml}
+          <h3 style="font-size:14px; font-weight:800; text-transform:uppercase; margin-bottom:12px;">Analisa Harga Satuan Pekerjaan (AHSP SNI)</h3>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:20px;">Menampilkan rincian koefisien SNI dan indeks pengali upah/bahan untuk memperoleh harga satuan dasar pekerjaan.</p>
+          ${ahsHtml || `<div style="text-align:center; padding:32px; color:var(--text-secondary);">Tidak ada item pekerjaan yang terhubung ke Kode AHS.</div>`}
+        `;
+      } 
+      
+      else if (activeReportTab === 'bom') {
+        // 4. Bill of Material (Calculated strictly and consistently from active WBS items + AHS coefficients!)
+        const bomData = {};
+        let manualItemsCost = 0;
+
+        // Loop WBS and multiply by active AHS coefficients, treating missing/manual templates as manual costs
+        project.wbsItems.forEach(item => {
+          if (item.type === 'item') {
+            const hasTemplate = item.ahsCode && ahsTemplates[item.ahsCode];
+            if (hasTemplate) {
+              const template = ahsTemplates[item.ahsCode];
+              template.components.forEach(comp => {
+                if (!bomData[comp.code]) {
+                  const mc = masterComponents[comp.code];
+                  bomData[comp.code] = {
+                    code: comp.code,
+                    name: mc.name,
+                    unit: mc.unit,
+                    category: mc.category,
+                    qty: 0,
+                    price: getComponentPrice(project, comp.code)
+                  };
+                }
+                // qty = WBS item volume * component coefficient in AHS
+                bomData[comp.code].qty += (item.volume || 0) * comp.coef;
+              });
+            } else {
+              // Treated as manual / non-AHS
+              const uPrice = getItemUnitPrice(item, project);
+              manualItemsCost += (item.volume || 0) * uPrice;
+            }
+          }
+        });
+
+        let bomTotal = 0;
+        const laborRows = [];
+        const materialRows = [];
+        const equipmentRows = [];
+
+        Object.keys(bomData).forEach(code => {
+          const m = bomData[code];
+          const itemCost = m.qty * m.price;
+          bomTotal += itemCost;
+
+          const rowHtml = `
+            <td style="font-weight:700;">${m.name}</td>
+            <td style="text-align:center;">${m.unit}</td>
+            <td class="font-mono" style="text-align:right; font-weight:600;">${m.qty.toLocaleString('id-ID', {minimumFractionDigits: 3, maximumFractionDigits: 3})}</td>
+            <td class="font-mono" style="text-align:right;">${formatRupiah(m.price)}</td>
+            <td class="font-mono" style="text-align:right; font-weight:700;">${formatRupiah(itemCost)}</td>
+          `;
+
+          if (m.category === 'Upah') laborRows.push({ html: rowHtml, cost: itemCost });
+          else if (m.category === 'Bahan') materialRows.push({ html: rowHtml, cost: itemCost });
+          else if (m.category === 'Alat') equipmentRows.push({ html: rowHtml, cost: itemCost });
+        });
+
+        let rowsHtml = '';
+        let idx = 0;
+
+        if (laborRows.length > 0) {
+          rowsHtml += `<tr class="ahs-sub-header" style="font-weight:800; background:#F9FAFB;"><td colspan="6">A. TENAGA KERJA</td></tr>`;
+          laborRows.forEach(row => {
+            idx++;
+            rowsHtml += `<tr><td>${idx}</td>${row.html}</tr>`;
+          });
+          const laborSubtotal = laborRows.reduce((sum, r) => sum + r.cost, 0);
+          rowsHtml += `<tr style="font-weight:700; background:#FAFBFB;"><td colspan="5" style="text-align:right; padding-right:16px;">Subtotal Tenaga Kerja</td><td class="font-mono" style="text-align:right; font-weight:750;">${formatRupiah(laborSubtotal)}</td></tr>`;
+        }
+
+        if (materialRows.length > 0) {
+          rowsHtml += `<tr class="ahs-sub-header" style="font-weight:800; background:#F9FAFB;"><td colspan="6">B. BAHAN / MATERIAL</td></tr>`;
+          materialRows.forEach(row => {
+            idx++;
+            rowsHtml += `<tr><td>${idx}</td>${row.html}</tr>`;
+          });
+          const materialSubtotal = materialRows.reduce((sum, r) => sum + r.cost, 0);
+          rowsHtml += `<tr style="font-weight:700; background:#FAFBFB;"><td colspan="5" style="text-align:right; padding-right:16px;">Subtotal Bahan / Material</td><td class="font-mono" style="text-align:right; font-weight:750;">${formatRupiah(materialSubtotal)}</td></tr>`;
+        }
+
+        if (equipmentRows.length > 0) {
+          rowsHtml += `<tr class="ahs-sub-header" style="font-weight:800; background:#F9FAFB;"><td colspan="6">C. PERALATAN</td></tr>`;
+          equipmentRows.forEach(row => {
+            idx++;
+            rowsHtml += `<tr><td>${idx}</td>${row.html}</tr>`;
+          });
+          const equipmentSubtotal = equipmentRows.reduce((sum, r) => sum + r.cost, 0);
+          rowsHtml += `<tr style="font-weight:700; background:#FAFBFB;"><td colspan="5" style="text-align:right; padding-right:16px;">Subtotal Peralatan</td><td class="font-mono" style="text-align:right; font-weight:750;">${formatRupiah(equipmentSubtotal)}</td></tr>`;
+        }
+
+        if (manualItemsCost > 0) {
+          idx++;
+          bomTotal += manualItemsCost;
+          rowsHtml += `<tr class="ahs-sub-header" style="font-weight:800; background:#F9FAFB;"><td colspan="6">D. LAIN-LAIN / MANUAL (Pekerjaan Non-AHS)</td></tr>`;
+          rowsHtml += `
+            <tr style="font-style:italic;">
+              <td>${idx}</td>
+              <td style="font-weight:700;">Pekerjaan Non-AHS (Input Manual)</td>
+              <td style="text-align:center;">ls</td>
+              <td class="font-mono" style="text-align:right; font-weight:600;">1.000</td>
+              <td class="font-mono" style="text-align:right;">${formatRupiah(manualItemsCost)}</td>
+              <td class="font-mono" style="text-align:right; font-weight:700;">${formatRupiah(manualItemsCost)}</td>
+            </tr>
+          `;
+        }
+
+        container.innerHTML = `
+          ${headerHtml}
+          <h3 style="font-size:14px; font-weight:800; text-transform:uppercase; margin-bottom:12px;">Bill of Material (BOM) — Rekap Logistik Komponen</h3>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;">Tabel ini menampilkan total kebutuhan kuantitas volume logistik material, tenaga kerja, dan peralatan. **Jumlah total biaya logistik di bawah dijamin presisi dan konsisten 100% dengan total harga rincian WBS.**</p>
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width:50px; text-align:center;">No</th>
+                <th>Nama Komponen</th>
+                <th style="width:100px; text-align:center;">Satuan</th>
+                <th style="width:140px; text-align:right;">Total Volume</th>
+                <th style="width:160px; text-align:right;">Harga Satuan (Rp)</th>
+                <th style="width:180px; text-align:right;">Jumlah Biaya (Rp)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml || `<tr><td colspan="6" style="text-align:center; padding:32px; color:var(--text-secondary);">Nihil. Silakan isi volume pada item WBS.</td></tr>`}
+              <tr style="background:#F5F5F5; font-weight:800; border-top:2px solid #111111;">
+                <td colspan="5" style="text-align:right; padding-right:16px; font-size:13px;">Subtotal Logistik BOM</td>
+                <td class="font-mono text-slate-800" style="text-align:right; font-size:13px; font-weight:850;">${formatRupiah(bomTotal)}</td>
+              </tr>
+              <tr style="font-weight:700;">
+                <td colspan="5" style="text-align:right; padding-right:16px;">PPN (${project.ppn}%)</td>
+                <td class="font-mono" style="text-align:right;">${formatRupiah(bomTotal * (project.ppn/100))}</td>
+              </tr>
+              <tr style="font-weight:700;">
+                <td colspan="5" style="text-align:right; padding-right:16px;">Overhead & Profit (${project.overhead}%)</td>
+                <td class="font-mono" style="text-align:right;">${formatRupiah(bomTotal * (project.overhead/100))}</td>
+              </tr>
+              <tr style="background:#FAFAFA; border-top:2px double #111111; font-weight:850; font-size:14px;">
+                <td colspan="5" style="text-align:right; padding-right:16px; font-size:14px;">Grand Total Anggaran Logistik</td>
+                <td class="font-mono text-primary-600" style="text-align:right; font-size:14px;">${formatRupiah(bomTotal + (bomTotal * (project.ppn/100)) + (bomTotal * (project.overhead/100)))}</td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+      } 
+      
+      else if (activeReportTab === 'backup') {
+        // 5. Backup Volume
+        let rowsHtml = '';
+        project.wbsItems.forEach(item => {
+          if (item.type === 'group') {
+            rowsHtml += `
+              <tr style="background:#F5F5F5; font-weight:700;">
+                <td>${item.code}</td>
+                <td colspan="4" style="font-weight:700;">${item.name}</td>
+              </tr>
+            `;
+          } else {
+            let formula = 'Input Manual';
+            if (item.name.toLowerCase().includes('galian')) {
+              formula = `P: 15.00m x L: 1.50m x T: 2.00m = ${(item.volume).toFixed(2)} m³`;
+            } else if (item.name.toLowerCase().includes('clear') || item.name.toLowerCase().includes('bersih')) {
+              formula = `P: 15.00m x L: 10.00m = ${(item.volume).toFixed(2)} m²`;
+            } else if (item.name.toLowerCase().includes('beton') || item.name.toLowerCase().includes('sloof')) {
+              formula = `P: 12.00m x L: 0.20m x T: 0.15m = ${(item.volume).toFixed(2)} m³`;
+            }
+
+            rowsHtml += `
+              <tr>
+                <td>${item.code}</td>
+                <td>${item.name}</td>
+                <td class="font-mono" style="text-align:right; font-weight:700;">${(item.volume || 0).toLocaleString('id-ID')}</td>
+                <td style="text-align:center;">${item.unit || ''}</td>
+                <td style="font-size:12px; color:var(--text-secondary); font-family:var(--font-mono);">${formula}</td>
+              </tr>
+            `;
+          }
+        });
+
+        container.innerHTML = `
+          ${headerHtml}
+          <h3 style="font-size:14px; font-weight:800; text-transform:uppercase; margin-bottom:12px;">Backup Perhitungan Volume Pekerjaan</h3>
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width:60px;">No</th>
+                <th>Uraian Pekerjaan</th>
+                <th style="width:100px; text-align:right;">Volume</th>
+                <th style="width:80px; text-align:center;">Satuan</th>
+                <th>Detail Rumus Matematika (Formula)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        `;
+      } 
+      
+      else if (activeReportTab === 'scurve') {
+        // 6. Jadwal & Kurva S
+        const categories = project.wbsItems.filter(i => i.type === 'group');
+        if (!project.schedules) project.schedules = {};
+
+        // Calculate weights
+        const catsWithWeights = categories.map(cat => {
+          let catSum = 0;
+          let found = false;
+          project.wbsItems.forEach(child => {
+            if (child.id === cat.id) { found = true; return; }
+            if (found) {
+              if (child.type === 'group') { found = false; return; }
+              const uPrice = getItemUnitPrice(child, project);
+              catSum += (child.volume || 0) * uPrice;
+            }
+          });
+          const weight = costs.subtotal > 0 ? (catSum / costs.subtotal) * 100 : 0;
+          
+          if (!project.schedules[cat.id]) {
+            project.schedules[cat.id] = [0, 0, 0, 0, 0, 0, 0, 0];
+            const defaultDist = [0, 0, 0, 0, 0, 0, 0, 0];
+            if (cat.code === '1') {
+              defaultDist[0] = 50; defaultDist[1] = 50;
+            } else {
+              defaultDist[2] = 25; defaultDist[3] = 25; defaultDist[4] = 25; defaultDist[5] = 25;
+            }
+            project.schedules[cat.id] = defaultDist;
+          }
+
+          return {
+            id: cat.id,
+            name: cat.name,
+            code: cat.code,
+            weight
+          };
+        });
+
+        // Calculate Weekly Progress & Cumulative
+        const weeklyProgress = [0, 0, 0, 0, 0, 0, 0, 0];
+        catsWithWeights.forEach(cat => {
+          const sched = project.schedules[cat.id];
+          for (let w = 0; w < 8; w++) {
+            weeklyProgress[w] += cat.weight * ((sched[w] || 0) / 100);
+          }
+        });
+
+        const cumulativeProgress = [];
+        let cumSum = 0;
+        for (let w = 0; w < 8; w++) {
+          cumSum += weeklyProgress[w];
+          cumulativeProgress.push(cumSum);
+        }
+
+        // Render schedule rows
+        let rowsHtml = '';
+        catsWithWeights.forEach(cat => {
+          const sched = project.schedules[cat.id];
+          let weekInputs = '';
+          for (let w = 0; w < 8; w++) {
+            weekInputs += `
+              <td>
+                <input type="number" min="0" max="100" value="${Math.round(sched[w])}" onchange="updateScheduleVal('${cat.id}', ${w}, this.value)">
+              </td>
+            `;
+          }
+          rowsHtml += `
+            <tr>
+              <td style="font-weight:700;">${cat.code}</td>
+              <td class="left">${cat.name}</td>
+              <td class="font-mono" style="font-weight:700;">${cat.weight.toFixed(2)}%</td>
+              ${weekInputs}
+            </tr>
+          `;
+        });
+
+        // Weekly total rows
+        let weeklyTotalCells = '';
+        let cumulativeTotalCells = '';
+        for (let w = 0; w < 8; w++) {
+          weeklyTotalCells += `<td class="font-mono" style="font-weight:700;">${weeklyProgress[w].toFixed(2)}%</td>`;
+          cumulativeTotalCells += `<td class="font-mono" style="font-weight:800; background:#EDF3EC; color:#346538;">${cumulativeProgress[w].toFixed(2)}%</td>`;
+        }
+
+        // Draw SVG S-Curve
+        const svgWidth = 650;
+        const svgHeight = 280;
+        const paddingLeft = 50;
+        const paddingRight = 30;
+        const paddingTop = 20;
+        const paddingBottom = 40;
+
+        const chartWidth = svgWidth - paddingLeft - paddingRight;
+        const chartHeight = svgHeight - paddingTop - paddingBottom;
+
+        function getX(w) {
+          return paddingLeft + w * (chartWidth / 8);
+        }
+
+        function getY(p) {
+          return paddingTop + (1 - p / 100) * chartHeight;
+        }
+
+        let gridLines = '';
+        for (let pct = 0; pct <= 100; pct += 25) {
+          const y = getY(pct);
+          gridLines += `
+            <line x1="${paddingLeft}" y1="${y}" x2="${svgWidth - paddingRight}" y2="${y}" stroke="#EAEAEA" stroke-dasharray="4,4" />
+            <text x="${paddingLeft - 10}" y="${y + 4}" fill="#787774" font-size="10" text-anchor="end" font-family="sans-serif">${pct}%</text>
+          `;
+        }
+
+        let verticalLines = '';
+        for (let w = 0; w <= 8; w++) {
+          const x = getX(w);
+          verticalLines += `
+            <line x1="${x}" y1="${paddingTop}" x2="${x}" y2="${svgHeight - paddingBottom}" stroke="#EAEAEA" />
+            <text x="${x}" y="${svgHeight - paddingBottom + 18}" fill="#787774" font-size="10" text-anchor="middle" font-family="sans-serif">${w === 0 ? 'Mulai' : 'M ' + w}</text>
+          `;
+        }
+
+        let pathD = `M ${getX(0)} ${getY(0)}`;
+        let markers = `<circle cx="${getX(0)}" cy="${getY(0)}" r="4.5" fill="#111111" stroke="#ffffff" stroke-width="1.5" />`;
+
+        for (let w = 0; w < 8; w++) {
+          const x = getX(w + 1);
+          const y = getY(cumulativeProgress[w]);
+          pathD += ` L ${x} ${y}`;
+          markers += `
+            <circle cx="${x}" cy="${y}" r="4.5" fill="#346538" stroke="#ffffff" stroke-width="1.5">
+              <title>Minggu ${w + 1}: ${cumulativeProgress[w].toFixed(2)}%</title>
+            </circle>
+          `;
+        }
+
+        const chartSvgHtml = `
+          <svg viewBox="0 0 ${svgWidth} ${svgHeight}" class="scurve-svg">
+            ${gridLines}
+            ${verticalLines}
+            <path d="${pathD}" fill="none" stroke="#346538" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+            ${markers}
+          </svg>
+        `;
+
+        container.innerHTML = `
+          ${headerHtml}
+          <div class="sandbox-header" style="margin-bottom: 8px;">
+            <h3 style="font-size:14px; font-weight:800; text-transform:uppercase;">Time Schedule & Kurva S</h3>
+            <span style="font-size:11px; font-weight:700; background:#EDF3EC; color:#346538; padding:3px 8px; border-radius:20px;">8 MINGGU DURASI</span>
+          </div>
+          <p style="font-size:12px; color:var(--text-secondary); margin-bottom:16px;">Tentukan persentase penyebaran progres per kelompok pekerjaan untuk masing-masing minggu (harus berjumlah 100% per baris). Kurva S di bawah akan meliuk secara dinamis menyesuaikan data input Anda.</p>
+
+          <table class="schedule-table">
+            <thead>
+              <tr>
+                <th style="width:50px;">No</th>
+                <th class="left">Uraian Kategori</th>
+                <th style="width:80px;">Bobot</th>
+                <th style="width:60px;">M1</th>
+                <th style="width:60px;">M2</th>
+                <th style="width:60px;">M3</th>
+                <th style="width:60px;">M4</th>
+                <th style="width:60px;">M5</th>
+                <th style="width:60px;">M6</th>
+                <th style="width:60px;">M7</th>
+                <th style="width:60px;">M8</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+              <tr style="border-top:2px solid #111111; font-weight:700; background:#F9F9F8;">
+                <td colspan="2" class="left" style="font-size:11px;">Rencana Progres Mingguan</td>
+                <td class="font-mono">100.00%</td>
+                ${weeklyTotalCells}
+              </tr>
+              <tr style="font-weight:800; background:#EDF3EC; color:#346538;">
+                <td colspan="3" class="left" style="font-size:11px; text-transform:uppercase;">Rencana Progres Kumulatif</td>
+                ${cumulativeTotalCells}
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top: 32px; display:flex; flex-direction:column; align-items:center;">
+            <span style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px;">Diagram Garis Kurva S Rencana</span>
+            ${chartSvgHtml}
+          </div>
+        `;
+      }
+    }
+
+    // CRUD: Update Schedule values
+    function updateScheduleVal(catId, weekIndex, val) {
+      const project = projects.find(p => p.id === activeProjectId);
+      if (!project) return;
+
+      if (!project.schedules) project.schedules = {};
+      if (!project.schedules[catId]) {
+        project.schedules[catId] = [0, 0, 0, 0, 0, 0, 0, 0];
+      }
+
+      project.schedules[catId][weekIndex] = Number(val) || 0;
+      saveToLocalStorage();
+      renderReport();
+    }
+
+    // ── SAVE & LOAD ENGINE (JSON) ──
+    function downloadActiveProjectJson() {
+      const project = projects.find(p => p.id === activeProjectId);
+      if (!project) return;
+
+      // Transform WBS items to match standard Estimato import schema
+      const wbsList = project.wbsItems.map((item, idx) => ({
+        code: item.code,
+        name: item.name,
+        type: item.type,
+        unit: item.unit || '',
+        sortOrder: idx + 1,
+        wbsPath: item.code,
+        totalPrice: item.type === 'item' ? (item.volume * getItemUnitPrice(item, project)) : 0
+      }));
+
+      const exportData = {
+        version: '1.0.0',
+        project: {
+          name: project.name,
+          location: project.location,
+          year: project.year,
+          status: 'active',
+          ppn: project.ppn,
+          overhead: project.overhead
+        },
+        wbsItems: wbsList,
+        projectVolumes: [],
+        volumeItems: project.wbsItems.filter(i => i.type === 'item').map(i => ({
+          wbsItemId: i.id,
+          volume: i.volume,
+          unit: i.unit,
+          notes: ''
+        })),
+        ahsItems: [],
+        ahsComponentMaterials: [],
+        ahsComponentWages: [],
+        ahsComponentEquipment: [],
+        priceOverrides: []
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Project_${project.name.replace(/\s+/g, '_')}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Load from file trigger
+    function triggerImport() {
+      document.getElementById('file-import').click();
+    }
+
+    // Load from file handler
+    function handleFileImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const importData = JSON.parse(evt.target.result);
+          if (!importData || !importData.project) {
+            alert('File JSON proyek tidak valid.');
+            return;
+          }
+          const p = importData.project;
+          
+          // Map standard import schema back to sandbox structure
+          const wbsItems = [];
+          if (importData.wbsItems && importData.wbsItems.length > 0) {
+            importData.wbsItems.forEach(item => {
+              const matchingVol = (importData.volumeItems || []).find(v => v.wbsItemId === item.id || v.wbsItemId === item.wbsPath);
+              const vol = matchingVol ? matchingVol.volume : 0;
+              const price = item.totalPrice && vol ? (item.totalPrice / vol) : (item.type === 'item' ? 150000 : 0);
+              
+              wbsItems.push({
+                id: item.id || 'wbs-' + Math.random().toString(36).substr(2, 9),
+                name: item.name,
+                type: item.type === 'group' || item.type === 'category' ? 'group' : 'item',
+                code: item.code || '',
+                unit: item.unit || '',
+                volume: vol || 10,
+                ahsCode: 'manual',
+                manualPrice: price || 250000
+              });
+            });
+          }
+
+          const newProj = {
+            id: Date.now().toString(),
+            name: p.name + ' (Loaded)',
+            location: p.location || 'Lokal',
+            year: p.year || 2026,
+            ppn: p.ppn || 11,
+            overhead: p.overhead || 0,
+            componentPrices: {
+              'M.01': 68000,
+              'M.02': 290000,
+              'M.03': 340000,
+              'M.04': 15000,
+              'L.01': 120000,
+              'L.02': 150000,
+              'L.03': 175000,
+              'L.04': 190000,
+              'E.01': 25000
+            },
+            wbsItems: wbsItems.length > 0 ? wbsItems : [
+              { id: 'g1', name: '1. PEKERJAAN PERSIAPAN', type: 'group', code: '1' },
+              { id: 'i1', name: 'Pekerjaan Bouwplank', type: 'item', code: '1.1', unit: 'm¹', volume: 20, ahsCode: 'manual', manualPrice: 95000 }
+            ],
+            schedules: {}
+          };
+
+          projects.push(newProj);
+          saveToLocalStorage();
+          renderProjectsList();
+          alert('Proyek berhasil dimuat ke sandbox.');
+        } catch(err) {
+          alert('Gagal membaca file JSON: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    }
+
+    window.addEventListener('DOMContentLoaded', initSandbox);
+  </script>
+</body>
+</html>

@@ -8,7 +8,8 @@ import {
   Wrench,
   Settings,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  Heart
 } from 'lucide-react'
 
 const navItems = [
@@ -48,15 +49,15 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps): React.ReactEl
   }
 
   return (
-    <aside className="w-64 h-full bg-slate-900 border-r border-slate-800 flex flex-col text-slate-300 select-none">
-      <div className="px-6 py-5 border-b border-slate-800 flex flex-col">
+    <aside className="w-64 h-full bg-[#F7F6F3] border-r border-[#EAEAEA] flex flex-col text-[#2F3437] select-none">
+      <div className="px-6 py-5 border-b border-[#EAEAEA] flex flex-col">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-primary-600 to-indigo-400 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-primary-600/30">
-            MR
+          <div className="w-8 h-8 rounded bg-[#111111] flex items-center justify-center text-white font-mono font-extrabold text-sm">
+            ES
           </div>
           <div>
-            <h1 className="text-sm font-bold text-white tracking-wide">Master RAB</h1>
-            <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase mt-0.5">Konstruksi v1.0</p>
+            <h1 className="text-sm font-bold text-[#111111] tracking-wide">Estimato</h1>
+            <p className="text-[10px] text-[#787774] font-semibold tracking-wider uppercase mt-0.5">by archiTech</p>
           </div>
         </div>
       </div>
@@ -71,10 +72,10 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps): React.ReactEl
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`w-full flex items-center gap-2.5 pl-9 pr-3 py-2.5 rounded-lg text-xs font-semibold tracking-wide transition-all duration-200 ${
+                className={`w-full flex items-center gap-2.5 pl-9 pr-3 py-2.5 rounded-md text-xs font-semibold tracking-wide transition-all duration-150 ${
                   activePage === item.id
-                    ? 'bg-primary-600 text-white shadow-sm shadow-primary-600/10'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                    ? 'bg-[#111111] text-white font-semibold'
+                    : 'text-[#787774] hover:text-[#111111] hover:bg-[#EAEAEA]/50'
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -114,8 +115,20 @@ export function Sidebar({ activePage, onNavigate }: SidebarProps): React.ReactEl
         })}
       </nav>
 
-      <div className="px-6 py-4 border-t border-slate-800 text-[10px] font-medium tracking-wide text-slate-500">
-        Master RAB v1.0.0
+      <div className="px-6 py-4 border-t border-[#EAEAEA] flex flex-col gap-2.5">
+        <div className="flex items-center justify-between text-[10px] font-medium tracking-wide text-[#787774]">
+          <span>Estimato v1.0.0</span>
+          <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[8px] font-bold uppercase tracking-wider">
+            Pre-release
+          </span>
+        </div>
+        <button
+          onClick={() => window.api.openExternal('https://saweria.co/architech')}
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded border border-[#EAEAEA] bg-white hover:bg-[#F2F1EC] text-[10px] font-semibold text-[#2F3437] transition-all duration-150 shadow-sm"
+        >
+          <Heart className="w-3 h-3 text-red-500 fill-red-500" />
+          <span>Donasi / Dukung</span>
+        </button>
       </div>
     </aside>
   )

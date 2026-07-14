@@ -1,5 +1,6 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import fs from 'fs'
+import { getOrCreateTelemetryUserId, sendTelemetrySignal } from '../services/telemetry'
 import { ProjectService } from '../services/project-service'
 import { MasterDataService } from '../services/master-data-service'
 import { WbsService } from '../services/wbs-service'
@@ -32,6 +33,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.PROJECT_UPDATE, (_e, id: string, data) => projectService.update(id, data))
   ipcMain.handle(IPC_CHANNELS.PROJECT_DELETE, (_e, id: string) => projectService.delete(id))
   ipcMain.handle(IPC_CHANNELS.PROJECT_GET_BY_STATUS, (_e, status: string) => projectService.getByStatus(status as 'draft' | 'active' | 'completed' | 'archived'))
+  ipcMain.handle(IPC_CHANNELS.PROJECT_EXPORT, (_e, projectId: string) => projectService.exportProject(projectId))
+  ipcMain.handle(IPC_CHANNELS.PROJECT_IMPORT, () => projectService.importProject())
 
   ipcMain.handle(IPC_CHANNELS.MATERIAL_GET_ALL, () => masterDataService.getAllMaterials())
   ipcMain.handle(IPC_CHANNELS.MATERIAL_GET_BY_ID, (_e, id: string) => masterDataService.getMaterialById(id))
@@ -151,4 +154,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.PROJECT_PRICE_OVERRIDE, (_e, projectId: string, componentId: string, category: 'Bahan' | 'Tenaga Kerja' | 'Alat', price: number) => projectPriceService.overridePrice(projectId, componentId, category, price))
   ipcMain.handle(IPC_CHANNELS.PROJECT_PRICE_GET_OVERRIDES, (_e, projectId: string) => projectPriceService.getOverrides(projectId))
   ipcMain.handle(IPC_CHANNELS.PROJECT_PRICE_DELETE_OVERRIDE, (_e, projectId: string, componentId: string) => projectPriceService.deleteOverride(projectId, componentId))
+
+  // Telemetry
+  ipcMain.handle(IPC_CHANNELS.TELEMETRY_GET_USER_ID, () => getOrCreateTelemetryUserId())
+  ipcMain.handle(IPC_CHANNELS.TELEMETRY_SEND_SIGNAL, (_e, type: string, payload: any) => sendTelemetrySignal(type, payload))
 }

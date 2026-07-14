@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dokumentasi Estimato by archiTech — Panduan Estimasi Proyek</title>
+  <meta name="description" content="Manual panduan lengkap penggunaan aplikasi Estimato. Pelajari sistem WBS, penghitungan AHS, ekspor Excel, dan backup database.">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <header>
+    <div class="container nav-container">
+      <a href="./index.html" class="logo">
+        <div class="logo-box">ES</div>
+        <span class="logo-text">Estimato</span>
+      </a>
+      <nav>
+        <a href="./index.html#features" class="nav-link">Fitur</a>
+        <a href="./docs.html" class="nav-link active">Dokumentasi</a>
+        <a href="./sandbox.html" class="nav-link">Sandbox</a>
+        <a href="#" class="btn btn-primary">Download v1.0.0</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Docs Layout -->
+  <div class="docs-layout">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="docs-sidebar">
+      <div class="docs-nav-group">
+        <div class="docs-nav-title">Mulai Cepat</div>
+        <ul class="docs-nav-list">
+          <li><a href="#intro" class="docs-nav-link active" onclick="showSection('intro', this)">1. Pendahuluan</a></li>
+          <li><a href="#quickstart" class="docs-nav-link" onclick="showSection('quickstart', this)">2. Alur Kerja Estimator</a></li>
+        </ul>
+      </div>
+      <div class="docs-nav-group">
+        <div class="docs-nav-title">Panduan Modul</div>
+        <ul class="docs-nav-list">
+          <li><a href="#wbs" class="docs-nav-link" onclick="showSection('wbs', this)">3. Work Breakdown (WBS)</a></li>
+          <li><a href="#ahs" class="docs-nav-link" onclick="showSection('ahs', this)">4. Analisa Harga Satuan</a></li>
+          <li><a href="#master" class="docs-nav-link" onclick="showSection('master', this)">5. Manajemen Master Data</a></li>
+        </ul>
+      </div>
+      <div class="docs-nav-group">
+        <div class="docs-nav-title">Pemeliharaan</div>
+        <ul class="docs-nav-list">
+          <li><a href="#backup" class="docs-nav-link" onclick="showSection('backup', this)">6. Backup & Restore</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content Panel -->
+    <main class="docs-content">
+      
+      <!-- 1. Pendahuluan -->
+      <section id="sect-intro" class="docs-section active">
+        <h1>Pendahuluan</h1>
+        <p>Selamat datang di dokumentasi panduan resmi **Estimato**. Estimato adalah aplikasi desktop khusus konstruksi yang dibangun untuk menyusun estimasi anggaran biaya (RAB) secara taktis, fleksibel, dan terstruktur.</p>
+        <p>Berbeda dengan spreadsheet konvensional yang rentan terhadap kesalahan formula referensi sel, Estimato memisahkan data komponen biaya global dengan struktur pekerjaan dinamis, meminimalkan human-error secara signifikan.</p>
+        
+        <h2>Fitur Utama:</h2>
+        <ul>
+          <li><strong>Penyusunan WBS Modular:</strong> Struktur bertingkat yang rapi memudahkan pengorganisasian kelompok pekerjaan utama dan sub-pekerjaan.</li>
+          <li><strong>Library AHS Terpadu:</strong> Kelola koefisien komponen AHS SNI Anda di satu perpustakaan pusat.</li>
+          <li><strong>Project Price Override:</strong> Sesuaikan harga material khusus untuk proyek tertentu tanpa merusak harga master data library global.</li>
+          <li><strong>Satu Klik Ekspor Excel:</strong> Dapatkan dokumen rekapitulasi, harga satuan, dan kebutuhan bahan yang rapi dan profesional untuk langsung diserahkan kepada klien.</li>
+        </ul>
+      </section>
+
+      <!-- 2. Alur Kerja Estimator -->
+      <section id="sect-quickstart" class="docs-section">
+        <h1>Alur Kerja Estimator</h1>
+        <p>Untuk memulai estimasi di aplikasi Estimato, ikuti 4 langkah alur kerja standar berikut:</p>
+        <ol>
+          <li><strong>Konfigurasi Pengaturan Global:</strong> Masuk ke tab Pengaturan untuk mendaftarkan nama instansi perencana, direktur penandatangan, default PPN, serta logo resmi perusahaan.</li>
+          <li><strong>Buat Proyek Baru:</strong> Klik tombol "Buat Proyek Baru" di Dashboard. Anda dapat memilih template struktur pekerjaan kosong atau template standar (seperti pembangunan rumah atau renovasi kamar mandi).</li>
+          <li><strong>Susun WBS & Input Volume:</strong> Tambahkan sub-pekerjaan dan sambungkan dengan jenis analisis AHS yang sesuai. Ketikkan nilai volume aktual pekerjaan lapangan.</li>
+          <li><strong>Ekspor Dokumen Penawaran:</strong> Masuk ke tab Laporan untuk memeriksa kalkulasi akhir RAB dan klik ekspor Excel untuk mengunduh laporan penawaran resmi.</li>
+        </ol>
+        <div class="docs-alert docs-alert-info">
+          <strong>Tips:</strong> Anda bisa melakukan kustomisasi harga material langsung dari tab "Harga Proyek" apabila supplier lokal memberikan harga khusus untuk proyek tersebut.
+        </div>
+      </section>
+
+      <!-- 3. Work Breakdown (WBS) -->
+      <section id="sect-wbs" class="docs-section">
+        <h1>Work Breakdown Structure (WBS)</h1>
+        <p>Struktur Pekerjaan (WBS) adalah dasar dari penyusunan RAB di Estimato. Dengan struktur ini, proyek dipecah menjadi bagian-bagian yang lebih kecil secara hierarkis.</p>
+        <h2>Level Hierarki Pekerjaan:</h2>
+        <ul>
+          <li><strong>Level 1 (Grup Pekerjaan Utama):</strong> Contohnya Pekerjaan Persiapan, Pekerjaan Struktur, Pekerjaan Atap. Grup ini bertindak sebagai wadah besar dan tidak memiliki volume langsung.</li>
+          <li><strong>Level 2 (Sub-Pekerjaan / Butir Pekerjaan):</strong> Pekerjaan detail seperti "Pemasangan Dinding Bata Merah 1:4". Butir inilah yang memiliki nilai volume aktual (m²), koefisien, dan tautan ke analisis AHS.</li>
+        </ul>
+        <h2>Cara Menghubungkan AHS ke Item Pekerjaan:</h2>
+        <p>Pada baris pekerjaan di tabel input RAB, klik tombol <strong>"Pilih AHS"</strong>. Cari kode AHS (misalnya <i>A.4.4.1.9</i>) dari jendela pop-up library dan hubungkan. Harga satuan pekerjaan (HSP) akan otomatis terkalkulasi berdasarkan harga satuan komponen AHS dikalikan koefisien masing-masing.</p>
+      </section>
+
+      <!-- 4. Analisa Harga Satuan -->
+      <section id="sect-ahs" class="docs-section">
+        <h1>Analisa Harga Satuan (AHS)</h1>
+        <p>Setiap analisis harga satuan pekerjaan (AHS) terdiri dari tiga kelompok komponen biaya dasar:</p>
+        <ol>
+          <li><strong>Tenaga Kerja (A):</strong> Pekerja, Tukang, Kepala Tukang, Mandor.</li>
+          <li><strong>Bahan / Material (B):</strong> Semen, bata merah, pasir pasang, kayu perancah, besi beton, dll.</li>
+          <li><strong>Alat (C):</strong> Sewa mixer molen, vibrator, sewa scaffolding, dll.</li>
+        </ol>
+        <h2>Rumus Perhitungan Harga Satuan Pekerjaan (HSP):</h2>
+        <p>Estimato menghitung harga satuan pekerjaan menggunakan formula baku sebagai berikut:</p>
+        <div class="docs-code">
+Subtotal Tenaga Kerja (A) = &Sigma; (Koefisien Tenaga x Upah Harian)
+Subtotal Bahan (B)       = &Sigma; (Koefisien Bahan x Harga Satuan Bahan)
+Subtotal Alat (C)        = &Sigma; (Koefisien Alat x Harga Sewa Harian)
+
+HSP Sebelum Overhead     = Subtotal A + Subtotal B + Subtotal C
+Overhead & Profit (%)    = HSP Sebelum Overhead x Persentase Overhead (misal: 10%)
+Harga Satuan Pekerjaan   = HSP Sebelum Overhead + Overhead & Profit</div>
+      </section>
+
+      <!-- 5. Manajemen Master Data -->
+      <section id="sect-master" class="docs-section">
+        <h1>Manajemen Master Data</h1>
+        <p>Master Data Library bertindak sebagai gudang referensi harga tunggal untuk seluruh proyek Anda. Anda dapat mengelola daftar harga material global, upah tenaga kerja regional, dan biaya sewa alat dari tab <strong>"Master Data"</strong> di sidebar.</p>
+        <h2>Perbedaan Harga Global dan Harga Proyek:</h2>
+        <ul>
+          <li><strong>Harga Global:</strong> Harga default yang berlaku saat pertama kali AHS dihubungkan ke proyek baru (misal: harga semen kupang Rp75.000/sak).</li>
+          <li><strong>Harga Proyek (Override):</strong> Perubahan harga material khusus di dalam proyek tertentu (misal: karena lokasi proyek di luar kota, harga semen naik menjadi Rp80.000/sak). Merubah harga proyek ini <strong>tidak akan merubah</strong> harga Rp75.000 di database global Anda.</li>
+        </ul>
+      </section>
+
+      <!-- 6. Backup & Restore -->
+      <section id="sect-backup" class="docs-section">
+        <h1>Backup & Restore Database</h1>
+        <p>Untuk mengamankan data proyek dan library AHS Anda dari kerusakan sistem atau ketika Anda ingin memindahkan data ke komputer lain, gunakan fitur pemeliharaan database.</p>
+        <h2>Langkah Melakukan Backup:</h2>
+        <ol>
+          <li>Masuk ke halaman <strong>Pengaturan</strong>.</li>
+          <li>Temukan panel <strong>Backup Database</strong> di bagian bawah halaman.</li>
+          <li>Klik tombol "Backup Database". Pilih lokasi penyimpanan berkas cadangan (.sqlite) di komputer Anda.</li>
+        </ol>
+        <div class="docs-alert docs-alert-info">
+          <strong>Perhatian:</strong> Simpan berkas hasil backup Anda dengan aman. Berkas cadangan memuat seluruh daftar master data library, database AHS, serta riwayat proyek RAB Anda.
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="container" style="border-top: 1px solid var(--border-color); margin-top: 40px;">
+    <div class="footer-container">
+      <div>
+        <p>&copy; 2026 archiTech. Hak Cipta Dilindungi.</p>
+      </div>
+      <div>
+        <a href="./index.html" class="nav-link">Kembali ke Beranda</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Simple Page Script for Interactive Section Toggling -->
+  <script>
+    function showSection(sectionId, element) {
+      // Hide all sections
+      const sections = document.querySelectorAll('.docs-section');
+      sections.forEach(s => s.classList.remove('active'));
+
+      // Deactivate all links
+      const links = document.querySelectorAll('.docs-nav-link');
+      links.forEach(l => l.classList.remove('active'));
+
+      // Show target section
+      document.getElementById('sect-' + sectionId).classList.add('active');
+
+      // Set current link active
+      element.classList.add('active');
+      
+      // Update hash in address bar silently
+      window.history.pushState(null, null, '#' + sectionId);
+    }
+
+    // Handle hash on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      const hash = window.location.hash.substring(1);
+      if (hash) {
+        const link = document.querySelector(`a[href="#${hash}"]`);
+        if (link) {
+          link.click();
+        }
+      }
+    });
+  </script>
+
+</body>
+</html>

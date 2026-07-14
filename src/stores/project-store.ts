@@ -16,6 +16,8 @@ interface ProjectActions {
   createProject: (data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'> & { template?: string }) => Promise<boolean>
   updateProject: (id: string, data: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>) => Promise<boolean>
   deleteProject: (id: string) => Promise<boolean>
+  exportProject: (id: string) => Promise<boolean>
+  importProject: () => Promise<string | null>
 }
 
 export type ProjectStore = ProjectState & ProjectActions
@@ -79,6 +81,30 @@ const projectStore = createStore<ProjectStore>((set, get) => ({
     } else {
       set({ error: result.error ?? 'Gagal menghapus proyek', loading: false })
       return false
+    }
+  },
+
+  exportProject: async (id) => {
+    set({ loading: true, error: null })
+    const result = await projectService.export(id)
+    set({ loading: false })
+    if (result.success) {
+      return true
+    } else {
+      set({ error: result.error ?? 'Gagal mengekspor proyek' })
+      return false
+    }
+  },
+
+  importProject: async () => {
+    set({ loading: true, error: null })
+    const result = await projectService.import()
+    if (result.success && result.data?.success) {
+      await get().loadProjects()
+      return result.data.projectId ?? null
+    } else {
+      set({ error: result.error ?? 'Gagal mengimpor proyek', loading: false })
+      return null
     }
   }
 }))

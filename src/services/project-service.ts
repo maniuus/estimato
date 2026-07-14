@@ -7,5 +7,7 @@ export const projectService = {
   update: (id: string, data: Partial<Omit<Project, 'id' | 'createdAt' | 'updatedAt'>>) =>
     window.api.project.update(id, data),
   delete: (id: string) => window.api.project.delete(id),
-  getByStatus: (status: Project['status']) => window.api.project.getByStatus(status)
+  getByStatus: (status: Project['status']) => window.api.project.getByStatus(status),
+  export: (projectId: string) => window.api.project.export(projectId),
+  import: () => window.api.project.import()
 }

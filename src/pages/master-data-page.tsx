@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useMasterDataStore } from '../stores/master-data-store'
 import { formatCurrency } from '../lib/format'
-import { Package, HardHat, Wrench, Plus, Edit, Trash2, Database } from 'lucide-react'
+import { Package, HardHat, Wrench, Plus, Edit, Trash2 } from 'lucide-react'
 
 type TabType = 'materials' | 'wages' | 'equipment'
 
@@ -30,6 +30,9 @@ export function MasterDataPage(): React.ReactElement {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormData>(emptyForm)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 50
 
   const store = useMasterDataStore()
 
@@ -97,6 +100,36 @@ export function MasterDataPage(): React.ReactElement {
     }
   }
 
+  const filteredMaterials = (store.materials || []).filter(m =>
+    m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (m.category && m.category.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (m.code && m.code.toLowerCase().includes(searchQuery.toLowerCase()))
+  )
+
+  const filteredWages = (store.wages || []).filter(w =>
+    w.type.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const filteredEquipment = (store.equipment || []).filter(e =>
+    e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (e.type && e.type.toLowerCase().includes(searchQuery.toLowerCase()))
+  )
+
+  const getFilteredCount = () => {
+    if (tab === 'materials') return filteredMaterials.length
+    if (tab === 'wages') return filteredWages.length
+    return filteredEquipment.length
+  }
+
+  const totalItems = getFilteredCount()
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1
+  const activePageNumber = Math.min(currentPage, totalPages)
+  const startIndex = (activePageNumber - 1) * itemsPerPage
+
+  const paginatedMaterials = filteredMaterials.slice(startIndex, startIndex + itemsPerPage)
+  const paginatedWages = filteredWages.slice(startIndex, startIndex + itemsPerPage)
+  const paginatedEquipment = filteredEquipment.slice(startIndex, startIndex + itemsPerPage)
+
   const tabs: { id: TabType; label: string; count: number; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: 'materials', label: 'Material', count: store.materials.length, icon: Package },
     { id: 'wages', label: 'Upah Tenaga', count: store.wages.length, icon: HardHat },
@@ -104,9 +137,9 @@ export function MasterDataPage(): React.ReactElement {
   ]
 
   const renderForm = (): React.ReactElement => (
-    <div className="card p-5 mb-5 bg-slate-50 border border-slate-200/80 shadow-inner">
-      <h4 className="text-xs font-bold mb-4 uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
-        <Plus className="w-4 h-4 text-indigo-500" />
+    <div className="card p-6 mb-6 bg-white border border-[#EAEAEA]">
+      <h4 className="text-xs font-bold mb-4 uppercase text-[#111111] tracking-wider flex items-center gap-1.5">
+        <Plus className="w-3.5 h-3.5 text-[#787774]" />
         <span>{editingId ? 'Edit' : 'Tambah'} {tabs.find(t => t.id === tab)?.label}</span>
       </h4>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -136,41 +169,37 @@ export function MasterDataPage(): React.ReactElement {
           </>
         )}
       </div>
-      <div className="flex gap-2.5 mt-4">
+      <div className="flex gap-2 mt-5">
         <button onClick={handleSubmit} className="btn-primary text-xs px-4 py-2">Simpan</button>
         <button onClick={resetForm} className="btn-secondary text-xs px-4 py-2">Batal</button>
       </div>
     </div>
   )
-
+ 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-5 rounded-xl border border-slate-100 gap-4 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-[#EAEAEA] pb-5 gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-primary-600 border border-indigo-100">
-            <Database className="w-5 h-5" />
-          </div>
           <div>
-            <h2 className="text-base font-extrabold text-slate-800 tracking-tight">Master Data Library</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Basis data global untuk referensi material, upah tenaga kerja, dan penyewaan alat.</p>
+            <h2 className="text-2xl font-bold text-[#111111] tracking-tight">Master Data Library</h2>
+            <p className="text-xs text-[#787774] mt-1 font-sans">Basis data global untuk referensi material, upah tenaga kerja, dan penyewaan alat.</p>
           </div>
         </div>
-        <div className="flex gap-1.5 bg-slate-100/80 p-1 rounded-xl w-fit border border-slate-200/30">
+        <div className="flex gap-1.5 bg-[#EAEAEA]/30 p-1 rounded-md w-fit border border-[#EAEAEA]">
           {tabs.map(t => {
-            const Icon = t.icon
             const isSelected = tab === t.id
             return (
               <button
                 key={t.id}
-                onClick={() => { setTab(t.id); resetForm() }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold tracking-wide transition-all duration-200 ${
+                onClick={() => { setTab(t.id); resetForm(); setSearchQuery(''); setCurrentPage(1) }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-xs font-bold tracking-wide transition-all duration-150 ${
                   isSelected
-                    ? 'bg-white shadow-sm text-primary-600'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/40'
+                    ? 'bg-[#111111] text-white shadow-xs'
+                    : 'text-[#787774] hover:text-[#111111]'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{t.label} ({t.count})</span>
+                <span>{t.label}</span>
+                <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${isSelected ? 'bg-white/20 text-white' : 'bg-black/5 text-[#787774]'}`}>{t.count}</span>
               </button>
             )
           })}
@@ -179,15 +208,24 @@ export function MasterDataPage(): React.ReactElement {
 
       {showForm && renderForm()}
 
-      <div className="card overflow-hidden bg-white border border-slate-100 shadow-sm">
+      <div className="card overflow-hidden bg-white border border-[#EAEAEA]">
         {tab === 'materials' && (
           <>
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/20">
-              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Daftar Material</span>
-              <button onClick={() => setShowForm(true)} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1">
-                <Plus className="w-3.5 h-3.5" />
-                <span>Tambah Material</span>
-              </button>
+            <div className="px-5 py-4 border-b border-[#EAEAEA] flex flex-col sm:flex-row justify-between items-center bg-[#F7F6F3]/30 gap-3">
+              <span className="text-xs font-bold text-[#111111] uppercase tracking-wider">Daftar Material</span>
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Cari material..."
+                  value={searchQuery}
+                  onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
+                  className="input-field max-w-xs text-xs px-3 py-1.5 bg-white"
+                />
+                <button onClick={() => setShowForm(true)} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 shrink-0">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Tambah Material</span>
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
@@ -201,14 +239,14 @@ export function MasterDataPage(): React.ReactElement {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {Array.isArray(store.materials) && store.materials.length === 0 ? (
+                  {Array.isArray(paginatedMaterials) && paginatedMaterials.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="text-center py-12 text-slate-400 font-medium italic text-sm">
                         Belum ada data material. Silakan tambah data material baru.
                       </td>
                     </tr>
                   ) : (
-                    store.materials.map(m => (
+                    paginatedMaterials.map(m => (
                       <tr key={m.id} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="table-cell font-bold text-slate-800">{m.name}</td>
                         <td className="table-cell text-slate-500 font-medium">{m.category}</td>
@@ -235,12 +273,21 @@ export function MasterDataPage(): React.ReactElement {
 
         {tab === 'wages' && (
           <>
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/20">
-              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Daftar Upah Tenaga Kerja</span>
-              <button onClick={() => setShowForm(true)} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1">
-                <Plus className="w-3.5 h-3.5" />
-                <span>Tambah Tenaga Kerja</span>
-              </button>
+            <div className="px-5 py-4 border-b border-[#EAEAEA] flex flex-col sm:flex-row justify-between items-center bg-[#F7F6F3]/30 gap-3">
+              <span className="text-xs font-bold text-[#111111] uppercase tracking-wider">Daftar Upah Tenaga Kerja</span>
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Cari upah..."
+                  value={searchQuery}
+                  onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
+                  className="input-field max-w-xs text-xs px-3 py-1.5 bg-white"
+                />
+                <button onClick={() => setShowForm(true)} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 shrink-0">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Tambah Tenaga Kerja</span>
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
@@ -253,14 +300,14 @@ export function MasterDataPage(): React.ReactElement {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {Array.isArray(store.wages) && store.wages.length === 0 ? (
+                  {Array.isArray(paginatedWages) && paginatedWages.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="text-center py-12 text-slate-400 font-medium italic text-sm">
                         Belum ada data tenaga kerja. Silakan tambah data baru.
                       </td>
                     </tr>
                   ) : (
-                    store.wages.map(w => (
+                    paginatedWages.map(w => (
                       <tr key={w.id} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="table-cell font-bold text-slate-800">{w.type}</td>
                         <td className="table-cell text-right font-mono font-bold text-slate-700">{formatCurrency(w.dailyWage)}</td>
@@ -286,12 +333,21 @@ export function MasterDataPage(): React.ReactElement {
 
         {tab === 'equipment' && (
           <>
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/20">
-              <span className="text-xs font-bold text-slate-655 uppercase tracking-wider">Daftar Alat</span>
-              <button onClick={() => setShowForm(true)} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1">
-                <Plus className="w-3.5 h-3.5" />
-                <span>Tambah Alat</span>
-              </button>
+            <div className="px-5 py-4 border-b border-[#EAEAEA] flex flex-col sm:flex-row justify-between items-center bg-[#F7F6F3]/30 gap-3">
+              <span className="text-xs font-bold text-[#111111] uppercase tracking-wider">Daftar Alat</span>
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Cari alat..."
+                  value={searchQuery}
+                  onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1) }}
+                  className="input-field max-w-xs text-xs px-3 py-1.5 bg-white"
+                />
+                <button onClick={() => setShowForm(true)} className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1 shrink-0">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Tambah Alat</span>
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
@@ -305,14 +361,14 @@ export function MasterDataPage(): React.ReactElement {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {Array.isArray(store.equipment) && store.equipment.length === 0 ? (
+                  {Array.isArray(paginatedEquipment) && paginatedEquipment.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="text-center py-12 text-slate-400 font-medium italic text-sm">
                         Belum ada data alat. Silakan tambah data baru.
                       </td>
                     </tr>
                   ) : (
-                    store.equipment.map(e => (
+                    paginatedEquipment.map(e => (
                       <tr key={e.id} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="table-cell font-bold text-slate-800">{e.name}</td>
                         <td className="table-cell text-slate-500 font-medium">{e.type}</td>
@@ -336,6 +392,34 @@ export function MasterDataPage(): React.ReactElement {
             </div>
           </>
         )}
+
+        {/* Unified Pagination Footer */}
+        <div className="px-5 py-3 border-t border-[#EAEAEA] flex items-center justify-between text-xs text-[#787774] font-medium bg-[#F7F6F3]/10">
+          <div>
+            Menampilkan {totalItems > 0 ? startIndex + 1 : 0} - {Math.min(startIndex + itemsPerPage, totalItems)} dari {totalItems} item
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                disabled={activePageNumber === 1}
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                className="btn-secondary text-[11px] px-2.5 py-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Sebelumnya
+              </button>
+              <span className="font-semibold text-[#111111] font-mono">
+                {activePageNumber} / {totalPages}
+              </span>
+              <button
+                disabled={activePageNumber === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                className="btn-secondary text-[11px] px-2.5 py-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Berikutnya
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

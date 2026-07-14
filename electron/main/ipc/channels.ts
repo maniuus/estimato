@@ -5,6 +5,8 @@ export const IPC_CHANNELS = {
   PROJECT_UPDATE: 'project:update',
   PROJECT_DELETE: 'project:delete',
   PROJECT_GET_BY_STATUS: 'project:getByStatus',
+  PROJECT_EXPORT: 'project:export',
+  PROJECT_IMPORT: 'project:import',
 
   MATERIAL_GET_ALL: 'material:getAll',
   MATERIAL_GET_BY_ID: 'material:getById',
@@ -92,5 +94,9 @@ export const IPC_CHANNELS = {
   // Project Price Overrides
   PROJECT_PRICE_OVERRIDE: 'projectPrice:override',
   PROJECT_PRICE_GET_OVERRIDES: 'projectPrice:getOverrides',
-  PROJECT_PRICE_DELETE_OVERRIDE: 'projectPrice:deleteOverride'
+  PROJECT_PRICE_DELETE_OVERRIDE: 'projectPrice:deleteOverride',
+
+  // Telemetry
+  TELEMETRY_GET_USER_ID: 'telemetry:getUserId',
+  TELEMETRY_SEND_SIGNAL: 'telemetry:sendSignal'
 } as const

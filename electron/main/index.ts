@@ -4,6 +4,7 @@ import { initDatabase, closeDatabase } from './database/connection'
 import { runMigrations } from './database/migrate'
 import { runSeed } from './database/seed'
 import { registerIpcHandlers } from './ipc/handlers'
+import { initTelemetry } from './services/telemetry'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -17,7 +18,8 @@ async function createWindow(): Promise<void> {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: false
     }
   })
 
@@ -47,6 +49,7 @@ async function createWindow(): Promise<void> {
 
 app.whenReady().then(async () => {
   try {
+    initTelemetry()
     console.log('[MasterRAB] Initializing database...')
     await initDatabase()
     console.log('[MasterRAB] Running migrations...')

@@ -3,6 +3,9 @@ import { WbsItemRepository } from '../database/repositories/wbs-repository'
 import { Project } from '../database/repositories/types'
 import { ServiceResult, success, failure } from './base-service'
 import { RabService } from './rab-service'
+import { dialog } from 'electron'
+import fs from 'fs'
+import { getDatabase } from '../database/connection'
 
 export class ProjectService {
   private repo = new ProjectRepository()
@@ -337,4 +340,263 @@ export class ProjectService {
       }
     }
   }
+
+  async exportProject(projectId: string): Promise<ServiceResult<{ success: boolean; filePath: string }>> {
+    try {
+      const project = this.repo.getById(projectId)
+      if (!project) return failure('Proyek tidak ditemukan')
+
+      const saveResult = await dialog.showSaveDialog({
+        title: 'Ekspor Proyek ke JSON',
+        defaultPath: `Project_${project.name.replace(/[\s/\\?%*:|"<>]/g, '_')}.json`,
+        filters: [{ name: 'JSON Files', extensions: ['json'] }],
+        properties: ['showOverwriteConfirmation']
+      })
+
+      if (saveResult.canceled || !saveResult.filePath) {
+        return failure('Ekspor dibatalkan')
+      }
+
+      const db = getDatabase()
+      
+      const queryAllRows = (sql: string, params: any[] = []) => {
+        const stmt = db.prepare(sql)
+        stmt.bind(params)
+        const rows: any[] = []
+        while (stmt.step()) {
+          rows.push(stmt.getAsObject())
+        }
+        stmt.free()
+        return rows
+      }
+
+      const wbsItems = queryAllRows('SELECT * FROM "WbsItem" WHERE projectId = ?', [projectId])
+      const projectVolumes = queryAllRows('SELECT * FROM "ProjectVolume" WHERE projectId = ?', [projectId])
+      const volumeItems = queryAllRows('SELECT * FROM "VolumeItem" WHERE wbsItemId IN (SELECT id FROM "WbsItem" WHERE projectId = ?)', [projectId])
+      const ahsItems = queryAllRows('SELECT * FROM "Ahs" WHERE projectId = ?', [projectId])
+      const ahsIdList = ahsItems.map(a => a.id)
+      
+      let ahsComponentMaterials: any[] = []
+      let ahsComponentWages: any[] = []
+      let ahsComponentEquipment: any[] = []
+      
+      if (ahsIdList.length > 0) {
+        const placeholders = ahsIdList.map(() => '?').join(',')
+        ahsComponentMaterials = queryAllRows(`SELECT * FROM "AhsComponentMaterial" WHERE ahsId IN (${placeholders})`, ahsIdList)
+        ahsComponentWages = queryAllRows(`SELECT * FROM "AhsComponentWage" WHERE ahsId IN (${placeholders})`, ahsIdList)
+        ahsComponentEquipment = queryAllRows(`SELECT * FROM "AhsComponentEquipment" WHERE ahsId IN (${placeholders})`, ahsIdList)
+      }
+
+      const priceOverrides = queryAllRows('SELECT * FROM "ProjectComponentPrice" WHERE projectId = ?', [projectId])
+
+      const exportData = {
+        version: '1.0.0',
+        project,
+        wbsItems,
+        projectVolumes,
+        volumeItems,
+        ahsItems,
+        ahsComponentMaterials,
+        ahsComponentWages,
+        ahsComponentEquipment,
+        priceOverrides
+      }
+
+      fs.writeFileSync(saveResult.filePath, JSON.stringify(exportData, null, 2), 'utf-8')
+      return success({ success: true, filePath: saveResult.filePath })
+    } catch (e) {
+      return failure((e as Error).message)
+    }
+  }
+
+  async importProject(): Promise<ServiceResult<{ success: boolean; projectId?: string }>> {
+    try {
+      const openResult = await dialog.showOpenDialog({
+        title: 'Impor Proyek dari JSON',
+        filters: [{ name: 'JSON Files', extensions: ['json'] }],
+        properties: ['openFile']
+      })
+
+      if (openResult.canceled || openResult.filePaths.length === 0) {
+        return failure('Impor dibatalkan')
+      }
+
+      const fileContent = fs.readFileSync(openResult.filePaths[0], 'utf-8')
+      const importData = JSON.parse(fileContent)
+
+      if (!importData || !importData.project || !importData.version) {
+        return failure('Format file JSON proyek tidak valid')
+      }
+
+      const db = getDatabase()
+      const { v4: uuid } = require('uuid')
+
+      const newProjectId = uuid()
+      const now = new Date().toISOString()
+
+      const p = importData.project
+      db.run(
+        `INSERT INTO "Project" (id, name, projectNumber, location, year, buildingType, buildingArea, floors, status, ppn, overhead, note, companyName, companyLogo, reportHeader, ownerName, ownerParaf, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          newProjectId,
+          p.name + ' (Import)',
+          p.projectNumber || '',
+          p.location || '',
+          p.year || 2026,
+          p.buildingType || '',
+          p.buildingArea || 0,
+          p.floors || 0,
+          p.status || 'draft',
+          p.ppn || 11,
+          p.overhead || 0,
+          p.note || '',
+          p.companyName || '',
+          p.companyLogo || '',
+          p.reportHeader || '',
+          p.ownerName || '',
+          p.ownerParaf || '',
+          now,
+          now
+        ]
+      )
+
+      const wbsIdMap = new Map<string, string>()
+      const projectVolIdMap = new Map<string, string>()
+      const ahsIdMap = new Map<string, string>()
+
+      const projectVolumes = importData.projectVolumes || []
+      for (const pv of projectVolumes) {
+        const newPvId = uuid()
+        projectVolIdMap.set(pv.id, newPvId)
+        db.run(
+          `INSERT INTO "ProjectVolume" (id, projectId, name, unit, value, formula, notes, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [newPvId, newProjectId, pv.name, pv.unit || '', pv.value || 0, pv.formula || '', pv.notes || '', now, now]
+        )
+      }
+
+      const ahsItems = importData.ahsItems || []
+      for (const ahs of ahsItems) {
+        const newAhsId = uuid()
+        ahsIdMap.set(ahs.id, newAhsId)
+        db.run(
+          `INSERT INTO "Ahs" (id, code, name, unit, category, source, totalPrice, projectId, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [newAhsId, ahs.code, ahs.name, ahs.unit, ahs.category || 'kustom', ahs.source || '', ahs.totalPrice || 0, newProjectId, now, now]
+        )
+      }
+
+      const ahsComponentMaterials = importData.ahsComponentMaterials || []
+      for (const comp of ahsComponentMaterials) {
+        const newCompId = uuid()
+        const newAhsId = ahsIdMap.get(comp.ahsId)
+        if (newAhsId) {
+          db.run(
+            `INSERT INTO "AhsComponentMaterial" (id, ahsId, materialId, coefficient, totalPrice)
+             VALUES (?, ?, ?, ?, ?)`,
+            [newCompId, newAhsId, comp.materialId, comp.coefficient || 0, comp.totalPrice || 0]
+          )
+        }
+      }
+
+      const ahsComponentWages = importData.ahsComponentWages || []
+      for (const comp of ahsComponentWages) {
+        const newCompId = uuid()
+        const newAhsId = ahsIdMap.get(comp.ahsId)
+        if (newAhsId) {
+          db.run(
+            `INSERT INTO "AhsComponentWage" (id, ahsId, wageId, coefficient, totalPrice)
+             VALUES (?, ?, ?, ?, ?)`,
+            [newCompId, newAhsId, comp.wageId, comp.coefficient || 0, comp.totalPrice || 0]
+          )
+        }
+      }
+
+      const ahsComponentEquipment = importData.ahsComponentEquipment || []
+      for (const comp of ahsComponentEquipment) {
+        const newCompId = uuid()
+        const newAhsId = ahsIdMap.get(comp.ahsId)
+        if (newAhsId) {
+          db.run(
+            `INSERT INTO "AhsComponentEquipment" (id, ahsId, equipmentId, coefficient, totalPrice)
+             VALUES (?, ?, ?, ?, ?)`,
+            [newCompId, newAhsId, comp.equipmentId, comp.coefficient || 0, comp.totalPrice || 0]
+          )
+        }
+      }
+
+      const wbsItems = importData.wbsItems || []
+      const sortedWbsItems = [...wbsItems].sort((a, b) => (a.wbsPath.split('.').length) - (b.wbsPath.split('.').length))
+
+      for (const item of sortedWbsItems) {
+        const newWbsId = uuid()
+        wbsIdMap.set(item.id, newWbsId)
+        const newParentId = item.parentId ? wbsIdMap.get(item.parentId) : null
+        
+        db.run(
+          `INSERT INTO "WbsItem" (id, projectId, parentId, code, name, unit, type, sortOrder, wbsPath, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            newWbsId,
+            newProjectId,
+            newParentId || null,
+            item.code,
+            item.name,
+            item.unit || '',
+            item.type || 'item',
+            item.sortOrder || 0,
+            item.wbsPath,
+            now,
+            now
+          ]
+        )
+      }
+
+      const volumeItems = importData.volumeItems || []
+      for (const vol of volumeItems) {
+        const newVolId = uuid()
+        const newWbsItemId = wbsIdMap.get(vol.wbsItemId)
+        if (newWbsItemId) {
+          const newProjectVolumeId = vol.projectVolumeId ? projectVolIdMap.get(vol.projectVolumeId) : null
+          const newAhsId = vol.ahsId ? ahsIdMap.get(vol.ahsId) : null
+          
+          db.run(
+            `INSERT INTO "VolumeItem" (id, wbsItemId, ahsId, volume, unit, formula, notes, projectVolumeId, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              newVolId,
+              newWbsItemId,
+              newAhsId || vol.ahsId || null,
+              vol.volume || 0,
+              vol.unit || '',
+              vol.formula || '',
+              vol.notes || '',
+              newProjectVolumeId || null,
+              now,
+              now
+            ]
+          )
+        }
+      }
+
+      const priceOverrides = importData.priceOverrides || []
+      for (const po of priceOverrides) {
+        const newPoId = uuid()
+        db.run(
+          `INSERT INTO "ProjectComponentPrice" (id, projectId, componentId, category, overriddenPrice, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [newPoId, newProjectId, po.componentId, po.category, po.overriddenPrice || 0, now, now]
+        )
+      }
+
+      const saveDatabase = require('../connection').saveDatabase
+      saveDatabase()
+
+      return success({ success: true, projectId: newProjectId })
+    } catch (e) {
+      return failure((e as Error).message)
+    }
+  }
 }
+

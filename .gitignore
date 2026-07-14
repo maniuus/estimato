@@ -55,3 +55,10 @@ electron.vite.config.*.mjs
 *.sln
 *.sw?
 processes.txt
+
+# Pre-release builds and archives
+pre-release/
+pre-release-dist/
+Estimato.rar
+Estimato.zip
+Estimato.7z

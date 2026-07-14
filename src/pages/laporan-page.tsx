@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { formatCurrency, getTerbilang } from '../lib/format'
 import { useLaporanData } from '../hooks/use-laporan-data'
 import { useLaporanExport } from '../hooks/use-laporan-export'
+import { useProjectStore } from '../stores/project-store'
 
 // Import modular report components
 import { RekapReport } from '../components/reports/rekap-report'
@@ -12,7 +13,7 @@ import { BomReport } from '../components/reports/bom-report'
 import { BackupReport } from '../components/reports/backup-report'
 
 import { parseFormulaToText } from '../components/volume-calculator/helpers'
-import { Printer, Download, FileSpreadsheet, FileText, ClipboardList, TrendingUp, BarChart2, ShieldAlert } from 'lucide-react'
+import { Printer, Download, FileSpreadsheet, FileText, ClipboardList, TrendingUp, BarChart2, ShieldAlert, FileJson } from 'lucide-react'
 
 interface LaporanPageProps {
   projectId: string
@@ -59,6 +60,8 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
     getGroupSubtotal
   })
 
+  const { exportProject } = useProjectStore()
+
   const [previewTab, setPreviewTab] = useState<'rekap' | 'rab' | 'analisa' | 'bom' | 'backup' | 'analisis_kurvas'>('rekap')
 
   if (!calculation || calculation.lineItems.length === 0) {
@@ -90,6 +93,13 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
     { id: 'analisis_kurvas', label: 'Kurva S & Jadwal', icon: TrendingUp }
   ]
 
+  const handleExportJson = async () => {
+    const success = await exportProject(projectId)
+    if (success) {
+      alert('Proyek berhasil disimpan ke file lokal.')
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Action Header */}
@@ -104,6 +114,13 @@ export function LaporanPage({ projectId }: LaporanPageProps): React.ReactElement
           </div>
         </div>
         <div className="flex gap-2">
+          <button 
+            onClick={handleExportJson}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#EAEAEA] bg-white text-[#111111] rounded-lg text-xs font-bold hover:bg-[#F5F5F5] transition-all"
+          >
+            <FileJson className="w-3.5 h-3.5 text-blue-600" />
+            <span>Save to Local (JSON)</span>
+          </button>
           <button 
             onClick={handlePrint} 
             className="btn-secondary text-xs px-3.5 py-2 flex items-center gap-1.5"

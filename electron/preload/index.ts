@@ -1,9 +1,13 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, shell } from 'electron'
 import { IPC_CHANNELS } from '../main/ipc/channels'
 
 const api = {
   invoke(channel: string, ...args: unknown[]): Promise<unknown> {
     return ipcRenderer.invoke(channel, ...args)
+  },
+
+  openExternal(url: string): Promise<void> {
+    return shell.openExternal(url)
   },
 
   project: {
@@ -12,7 +16,9 @@ const api = {
     create: (data: unknown) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_CREATE, data),
     update: (id: string, data: unknown) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_UPDATE, id, data),
     delete: (id: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_DELETE, id),
-    getByStatus: (status: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_GET_BY_STATUS, status)
+    getByStatus: (status: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_GET_BY_STATUS, status),
+    export: (projectId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_EXPORT, projectId),
+    import: () => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_IMPORT)
   },
 
   material: {
@@ -121,6 +127,11 @@ const api = {
     override: (projectId: string, componentId: string, category: 'Bahan' | 'Tenaga Kerja' | 'Alat', price: number) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_PRICE_OVERRIDE, projectId, componentId, category, price),
     getOverrides: (projectId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_PRICE_GET_OVERRIDES, projectId),
     deleteOverride: (projectId: string, componentId: string) => ipcRenderer.invoke(IPC_CHANNELS.PROJECT_PRICE_DELETE_OVERRIDE, projectId, componentId)
+  },
+
+  telemetry: {
+    getUserId: () => ipcRenderer.invoke(IPC_CHANNELS.TELEMETRY_GET_USER_ID),
+    sendSignal: (type: string, payload: any) => ipcRenderer.invoke(IPC_CHANNELS.TELEMETRY_SEND_SIGNAL, type, payload)
   }
 }
 

@@ -1,6 +1,7 @@
 import React from 'react'
 import { useProjectStore } from '../stores/project-store'
 import { formatCurrency, formatDateShort, STATUS_LABELS, STATUS_COLORS } from '../lib/format'
+import { Trash2 } from 'lucide-react'
 
 interface ProjectListProps {
   onSelectProject: (id: string) => void
@@ -33,12 +34,13 @@ export function ProjectList({ onSelectProject }: ProjectListProps): React.ReactE
             <th className="table-header">Tahun</th>
             <th className="table-header">Nilai</th>
             <th className="table-header">Status</th>
+            <th className="table-header text-center w-28">Aksi</th>
           </tr>
         </thead>
         <tbody>
           {projects.length === 0 ? (
             <tr>
-              <td colSpan={5} className="text-center py-8 text-gray-400">
+              <td colSpan={6} className="text-center py-8 text-gray-400">
                 Belum ada proyek. Klik "Buat Proyek" untuk memulai.
               </td>
             </tr>
@@ -57,6 +59,19 @@ export function ProjectList({ onSelectProject }: ProjectListProps): React.ReactE
                   <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide ${STATUS_COLORS[project.status]}`}>
                     {STATUS_LABELS[project.status]}
                   </span>
+                </td>
+                <td className="table-cell text-center" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={async () => {
+                      if (confirm(`Apakah Anda yakin ingin menghapus proyek "${project.name}"? Seluruh rincian volume, AHS kustom, dan estimasi WBS akan dihapus permanen.`)) {
+                        await storeData.deleteProject(project.id)
+                      }
+                    }}
+                    className="text-red-600 hover:text-red-800 font-bold text-xs inline-flex items-center gap-1 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus</span>
+                  </button>
                 </td>
               </tr>
             ))

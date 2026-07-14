@@ -41,10 +41,10 @@ export const STATUS_LABELS: Record<string, string> = {
 }
 
 export const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-slate-50 text-slate-600 border border-slate-200/60',
-  active: 'bg-indigo-50/70 text-indigo-700 border border-indigo-100',
-  completed: 'bg-emerald-50/70 text-emerald-700 border border-emerald-100',
-  archived: 'bg-amber-50/70 text-amber-700 border border-amber-100'
+  draft: 'bg-[#FDEBEC] text-[#9F2F2D] border border-[#FDEBEC]',
+  active: 'bg-[#E1F3FE] text-[#1F6C9F] border border-[#E1F3FE]',
+  completed: 'bg-[#EDF3EC] text-[#346538] border border-[#EDF3EC]',
+  archived: 'bg-[#FBFBFA] text-[#787774] border border-[#EAEAEA]'
 }
 
 function terbilang(nominal: number): string {

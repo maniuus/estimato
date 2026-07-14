@@ -5,26 +5,27 @@ module.exports = {
     extend: {
       colors: {
         primary: {
-          50: '#f5f3ff',
-          100: '#ede9fe',
-          200: '#ddd6fe',
-          300: '#c4b5fd',
-          400: '#a78bfa',
-          500: '#8b5cf6',
-          600: '#7c3aed',
-          700: '#6d28d9',
-          800: '#5b21b6',
-          900: '#4c1d95',
-          950: '#2e1065'
+          50: '#F9F9F8',
+          100: '#EAEAEA',
+          200: '#D4D4D8',
+          300: '#A1A1AA',
+          400: '#71717A',
+          500: '#2F3437',
+          600: '#111111',
+          700: '#09090B',
+          800: '#000000',
+          900: '#000000',
+          950: '#000000'
         },
         slate: {
-          850: '#1e293b',
-          950: '#0f172a'
+          850: '#1E293B',
+          950: '#0F172A'
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace']
+        sans: ['Geist', 'SF Pro Display', 'Helvetica Neue', 'Switzer', 'sans-serif'],
+        serif: ['Instrument Serif', 'Playfair Display', 'serif'],
+        mono: ['Geist Mono', 'SF Mono', 'JetBrains Mono', 'monospace']
       }
     }
   },
