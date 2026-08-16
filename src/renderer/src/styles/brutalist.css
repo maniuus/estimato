@@ -1,0 +1,434 @@
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.hd {
+  background: var(--ink);
+  color: var(--paper);
+  border-bottom: 5px solid var(--red);
+  padding: 14px 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.hd .kicker {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--paper);
+  opacity: 0.7;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.hd h1 {
+  font-family: 'Archivo Black', Inter, sans-serif;
+  font-size: clamp(1.3rem, 3.5vw, 2rem);
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.hd h1 .hl {
+  color: var(--red);
+}
+
+.hd .sub {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  margin-top: 2px;
+}
+
+.hd .rev {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.hd .rev .r {
+  color: var(--red);
+  font-weight: 800;
+}
+
+.main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.side {
+  flex: 1;
+  min-width: 150px;
+  border-right: 2px solid var(--ink);
+  background: var(--paper2);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.side .side-title {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 12px 14px;
+  background: var(--ink);
+  color: var(--paper);
+  border-bottom: 1px solid var(--paper);
+}
+
+.side button.nav {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--ink);
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  padding: 11px 14px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.side button.nav:hover {
+  background: var(--red);
+  color: var(--paper);
+}
+
+.side button.nav.active {
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: inset 6px 0 0 0 var(--red);
+}
+
+.content {
+  flex: 7;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 18px 22px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--ink);
+  padding: 14px 16px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.row > input,
+.row > select {
+  flex: 1;
+  min-width: 120px;
+}
+
+.mt {
+  margin-top: 12px;
+}
+
+.mt2 {
+  margin-top: 20px;
+}
+
+.msg {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.msg.err {
+  color: var(--red);
+}
+
+.msg.ok {
+  color: var(--ink);
+}
+
+.empty {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 30px 0;
+  text-align: center;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.stat {
+  border: 1px solid var(--ink);
+  padding: 10px 12px;
+  background: var(--card);
+}
+
+.stat .lbl {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.stat .val {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 18px;
+  font-weight: 800;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.group-row {
+  background: var(--red);
+  color: #fff;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 11px;
+}
+
+.subtotal {
+  border: 2px solid var(--ink);
+  margin-top: 14px;
+  background: var(--card);
+}
+
+.subtotal .line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 12px;
+}
+
+.subtotal .line b {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.subtotal .line.total {
+  border-top: 2px solid var(--ink);
+  font-weight: 800;
+}
+
+.subtotal .line.f {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.subtotal .line.f b {
+  color: var(--red);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tabs button {
+  background: transparent;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+}
+
+.tabs button.active {
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: inset 0 4px 0 0 var(--red);
+}
+
+.tabs button:hover {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+
+.act {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.act button.mini {
+  padding: 2px 7px;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* layout 3 kolom: navbar (1/8, di App) · main RAB (5/8) · tools (2/8) */
+.builder {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.builder-main {
+  flex: 5;
+  min-width: 0;
+}
+
+.builder-tools {
+  flex: 2;
+  min-width: 0;
+  position: sticky;
+  top: 0;
+}
+
+.tools-card {
+  border: 1px solid var(--ink);
+  background: var(--card);
+  padding: 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tools-card + .tools-card {
+  margin-top: 14px;
+}
+
+/* tabel di dalam tools-card (sidebar kanan sempit): fixed layout + lebar kolom eksplisit (via th style width) */
+.tools-card table {
+  width: 100%;
+  table-layout: fixed;
+  font-size: 10px;
+}
+.tools-card th,
+.tools-card td {
+  padding: 3px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tools-card td.num {
+  white-space: nowrap;
+  text-align: right;
+}
+.tools-card input {
+  width: 100% !important;
+  min-width: 0;
+  padding: 2px 4px;
+  font-size: 10px;
+}
+.tools-card select {
+  min-width: 0;
+  padding: 2px 4px;
+  font-size: 10px;
+  width: 100%;
+}
+.tools-card button {
+  padding: 1px 5px;
+  font-size: 10px;
+}
+.tools-card .row input {
+  width: auto !important;
+  flex: 1;
+}
+.tools-card .row {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tools-card .subtotal .line b {
+  font-size: 10px;
+}
+
+.tools-card.anim {
+  animation: slideIn .25s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* cell tabel daftar item: tetap teks polos tapi bisa diklik → sidebar */
+td[data-click] {
+  cursor: pointer;
+}
+td[data-click]:hover {
+  background: var(--paper2);
+  text-decoration: underline;
+}
+
+/* ---- Report page ---- */
+.rep-grid {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.rep-side {
+  flex: 1;
+  min-width: 240px;
+  max-width: 320px;
+  position: sticky;
+  top: 0;
+}
+
+.rep-preview {
+  flex: 3;
+  min-width: 0;
+}
+
+.rep-paper {
+  border: 1px solid var(--ink);
+  background: #fff;
+  padding: 24px 28px;
+  overflow-x: auto;
+}
+
+.rep-side .fld {
+  display: block;
+  margin: 8px 0;
+}
+
+.rep-side .fld > span {
+  display: block;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 3px;
+}
+
+.rep-side .fld > input,
+.rep-side .fld > textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 11px;
+}
