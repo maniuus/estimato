@@ -1,7 +1,8 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { SQLInputValue } from 'node:sqlite'
+import { DatabaseSync } from 'node:sqlite'
 import { join } from 'path'
-import { existsSync } from 'fs'
+import { existsSync, copyFileSync, rmSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import { app } from 'electron'
 import { openDb } from './db'
@@ -53,6 +54,31 @@ export function registerIpc() {
   const jadCols = appDb.prepare("SELECT name FROM pragma_table_info('rab_jadwal')").all() as { name: string }[]
   if (!jadCols.some((c) => c.name === 'jumlah_pekerja')) {
     appDb.exec('ALTER TABLE rab_jadwal ADD COLUMN jumlah_pekerja REAL DEFAULT 1')
+  }
+
+  const refDbPath = join(app.getPath('userData'), 'estimato-ref.db')
+  const bundled = join(process.resourcesPath, 'estimato-ref.db')
+  let needSeed = existsSync(bundled) && !existsSync(refDbPath)
+  if (!needSeed && existsSync(bundled) && existsSync(refDbPath)) {
+    try {
+      const probe = new DatabaseSync(refDbPath, { readOnly: true })
+      const m = probe.prepare('SELECT COUNT(*) AS c FROM ref_meta').get() as { c: number }
+      probe.close()
+      needSeed = m.c === 0
+    } catch {
+      needSeed = true
+    }
+  }
+  if (needSeed) {
+    try {
+      rmSync(refDbPath, { force: true })
+      rmSync(refDbPath + '-wal', { force: true })
+      rmSync(refDbPath + '-shm', { force: true })
+      copyFileSync(bundled, refDbPath)
+      console.log('[estimato] referensi AHSP disalin dari bundled resources')
+    } catch (err) {
+      console.warn('[estimato] gagal salin referensi bundled:', err)
+    }
   }
 
   const refDb = openDb('ref')

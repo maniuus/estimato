@@ -4,4 +4,5 @@ dist/
 dev.log
 .data/
 *.tsbuildinfo
-.DS_Store
+.DS_Storeresources/estimato-ref.db-wal
+resources/estimato-ref.db-shm

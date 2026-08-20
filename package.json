@@ -1,6 +1,6 @@
 {
   "name": "estimato",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Estimato v2 — Estimasi biaya konstruksi dengan database referensi modular",
   "main": "./out/main/index.js",
   "author": "Abimanyu",

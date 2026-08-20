@@ -6,6 +6,9 @@ directories:
 files:
   - out/**
   - package.json
+extraResources:
+  - from: resources/estimato-ref.db
+    to: estimato-ref.db
 asar: true
 compression: maximum
 win:
