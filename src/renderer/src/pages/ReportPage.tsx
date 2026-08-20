@@ -123,6 +123,16 @@ export default function ReportPage({
   const [msg, setMsg] = useState<{ t: 'err' | 'ok'; s: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const logoRef = useRef<HTMLInputElement>(null)
+  const [sel, setSel] = useState<Record<string, boolean>>({
+    rekap: true,
+    rab: true,
+    ahsp: true,
+    bom: true,
+    bomItem: true,
+    jadwal: true,
+    volume: true
+  })
+  const toggle = (k: string) => setSel((s) => ({ ...s, [k]: !s[k] }))
 
   const load = async () => {
     const [pl, it, v, h, b, pr, jd] = await Promise.all([
@@ -311,12 +321,28 @@ export default function ReportPage({
         })
       }
     }
-    const perItem = materialItemBlocks()
-    if (perItem.length) {
-      blocks.push({ kind: 'html', html: '<h3>Kebutuhan Material per Item</h3>' })
-      blocks.push(...perItem)
-    }
     return blocks
+  }
+
+  const bomItemBlocks = (): Block[] => {
+    const perItem = materialItemBlocks()
+    if (!perItem.length) return []
+    return [{ kind: 'html', html: '<h3>Kebutuhan Material per Item</h3>' }, ...perItem]
+  }
+
+  const jadwalBlocks = (): Block[] => {
+    const rows = jadwal.map(
+      (r) =>
+        `<tr><td class="num">${r.item_kode ?? ''}</td><td>${r.item_uraian ?? ''}</td><td class="num">${r.durasi ?? ''}</td><td class="num">${r.jumlah_pekerja ?? ''}</td><td>${r.tanggal_mulai ?? ''}</td><td>${r.tanggal_selesai ?? ''}</td></tr>`
+    )
+    return [
+      { kind: 'html', html: '<h3>Rencana Kerja (Jadwal)</h3>' },
+      {
+        kind: 'table',
+        thead: `<thead><tr><th style="width:12%">Kode</th><th>Pekerjaan</th><th class="num" style="width:11%">Durasi (hari)</th><th class="num" style="width:12%">Jml Pekerja</th><th class="num" style="width:13%">Mulai</th><th class="num" style="width:13%">Selesai</th></tr></thead>`,
+        rows
+      }
+    ]
   }
 
   const materialItemBlocks = (): Block[] => {
@@ -426,8 +452,9 @@ export default function ReportPage({
       </table>`
     const grandHtml = `<div class="rep-grand">GRAND TOTAL RENCANA ANGGARAN BIAYA<br />${fmtRp(grandTotal)}</div><div class="rep-terbilang">(${terbilang(grandTotal)})</div>`
     const catatanHtml = form.catatan ? `<div class="rep-catatan">Catatan:\n${form.catatan}</div>` : ''
-    const sec: Section[] = [
-      {
+    const sec: Section[] = []
+    if (sel.rekap) {
+      sec.push({
         title: 'Rekapitulasi',
         blocks: [
           { kind: 'html', html: header },
@@ -440,16 +467,26 @@ export default function ReportPage({
           { kind: 'html', html: grandHtml },
           ...(catatanHtml ? [{ kind: 'html' as const, html: catatanHtml }] : [])
         ]
-      },
-      { title: 'RAB & Item Pekerjaan', blocks: rincianBlocks() },
-      { title: 'Analisa Harga Satuan', blocks: analisaBlocks() },
-      { title: 'Bill of Material', blocks: bomBlocks() },
-      { title: 'Backup Volume', blocks: volumeBlocks() },
-      { title: 'Tanda Tangan', blocks: [{ kind: 'html', html: renderTtd() }] }
-    ]
+      })
+    }
+    if (sel.rab) sec.push({ title: 'RAB & Item Pekerjaan', blocks: rincianBlocks() })
+    if (sel.ahsp) sec.push({ title: 'Analisa Harga Satuan', blocks: analisaBlocks() })
+    if (sel.bom) sec.push({ title: 'Bill of Material', blocks: bomBlocks() })
+    if (sel.bomItem) {
+      const b = bomItemBlocks()
+      if (b.length) sec.push({ title: 'Kebutuhan Material per Item', blocks: b })
+    }
+    if (sel.jadwal) sec.push({ title: 'Rencana Kerja (Jadwal)', blocks: jadwalBlocks() })
+    if (sel.volume) sec.push({ title: 'Backup Volume', blocks: volumeBlocks() })
+    if (!sec.length) return []
+    // kop perusahaan selalu di halaman pertama meski Rekapitulasi tidak dipilih
+    if (!sel.rekap) {
+      sec[0] = { ...sec[0], blocks: [{ kind: 'html', html: header }, ...sec[0].blocks] }
+    }
+    sec.push({ title: 'Tanda Tangan', blocks: [{ kind: 'html', html: renderTtd() }] })
     return sec
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projek, form, grouped, grandTotal, items, hitung, profiles, ptul, volumes, rekapRows])
+  }, [projek, form, grouped, grandTotal, items, hitung, profiles, ptul, volumes, rekapRows, jadwal, sel])
 
   const buildHtml = (body: string) =>
     `<!DOCTYPE html><html lang="id"><head><meta charset="utf-8" /><title>RAB ${rabNama}</title><style>${REPORT_CSS}</style></head><body>${body}</body></html>`
@@ -663,6 +700,24 @@ export default function ReportPage({
       {msg && <div className={'msg mt ' + msg.t}>{msg.s}</div>}
       <div className="rep-grid">
         <aside className="rep-side">
+          <div className="side-title">Bagian yang Ditampilkan</div>
+          {[
+            ['rekap', 'Rekapitulasi'],
+            ['rab', 'RAB — rincian per divisi'],
+            ['ahsp', 'Analisa Harga Satuan (AHSP)'],
+            ['bom', 'BOM Global'],
+            ['bomItem', 'BOM per Item Pekerjaan'],
+            ['jadwal', 'Rencana Kerja (Jadwal)'],
+            ['volume', 'Backup Volume per Item']
+          ].map(([k, label]) => (
+            <label className="sec-check" key={k}>
+              <input type="checkbox" checked={!!sel[k]} onChange={() => toggle(k)} />
+              <span>{label}</span>
+            </label>
+          ))}
+          <button className="mini" onClick={() => setSel({ rekap: true, rab: true, ahsp: true, bom: true, bomItem: true, jadwal: true, volume: true })}>
+            Semua
+          </button>
           <div className="side-title">Layout Report</div>
           {field('Nama Perusahaan', 'nama_perusahaan', 'PT Contoh Konstruksi')}
           {field('Alamat / Kota', 'alamat', 'Jl. Merdeka No. 1\nJakarta', true)}

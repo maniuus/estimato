@@ -9,6 +9,7 @@ import { openDb } from './db'
 import { APP_SCHEMA } from './db/app-schema'
 import { REF_SCHEMA } from './db/ref-schema'
 import { importReference } from './db/import-ref'
+import type { ItemSearchResult } from '../shared/types'
 
 const DEFAULT_REF_SOURCE = {
   kode: 'SE-DJBK-47-2026',
@@ -50,10 +51,38 @@ export function registerIpc() {
     appDb.exec('ALTER TABLE rab_profil ADD COLUMN gambar TEXT')
   }
 
+  // migrasi: gambar take-off volume (data URL base64)
+  const volCols = appDb.prepare("SELECT name FROM pragma_table_info('rab_volume')").all() as { name: string }[]
+  if (!volCols.some((c) => c.name === 'gambar')) {
+    appDb.exec('ALTER TABLE rab_volume ADD COLUMN gambar TEXT')
+  }
+
   // migrasi: jumlah pekerja utk hitung durasi di rab_jadwal
   const jadCols = appDb.prepare("SELECT name FROM pragma_table_info('rab_jadwal')").all() as { name: string }[]
   if (!jadCols.some((c) => c.name === 'jumlah_pekerja')) {
     appDb.exec('ALTER TABLE rab_jadwal ADD COLUMN jumlah_pekerja REAL DEFAULT 1')
+  }
+
+  // migrasi: hirarki & volume referensi utk analisa user-defined
+  const auCols = appDb.prepare("SELECT name FROM pragma_table_info('analisa_user')").all() as { name: string }[]
+  if (!auCols.some((c) => c.name === 'parent_kode')) {
+    appDb.exec('ALTER TABLE analisa_user ADD COLUMN parent_kode TEXT')
+  }
+  if (!auCols.some((c) => c.name === 'vol_ref')) {
+    appDb.exec('ALTER TABLE analisa_user ADD COLUMN vol_ref REAL')
+  }
+  const aukCols = appDb.prepare("SELECT name FROM pragma_table_info('analisa_user_komponen')").all() as { name: string }[]
+  if (!aukCols.some((c) => c.name === 'ref_input1')) {
+    appDb.exec('ALTER TABLE analisa_user_komponen ADD COLUMN ref_input1 REAL')
+  }
+  if (!aukCols.some((c) => c.name === 'ref_input2')) {
+    appDb.exec('ALTER TABLE analisa_user_komponen ADD COLUMN ref_input2 REAL')
+  }
+
+  // migrasi: PPN per RAB
+  const rabCols = appDb.prepare("SELECT name FROM pragma_table_info('rab')").all() as { name: string }[]
+  if (!rabCols.some((c) => c.name === 'ppn_pct')) {
+    appDb.exec('ALTER TABLE rab ADD COLUMN ppn_pct REAL NOT NULL DEFAULT 0')
   }
 
   const refDbPath = join(app.getPath('userData'), 'estimato-ref.db')
@@ -146,7 +175,50 @@ export function registerIpc() {
     if (where.length) sql += ' WHERE ' + where.join(' AND ')
     sql += ' ORDER BY i.kode LIMIT ?'
     params.push(limit)
-    return refDb.prepare(sql).all(...params)
+    const ref = refDb.prepare(sql).all(...params) as unknown as ItemSearchResult[]
+    // sertakan analisa user-defined (global, bisa dicari & dipakai lintas projek)
+    const uWhere: string[] = []
+    const uParams: (string | number)[] = []
+    if (q) {
+      uWhere.push('(uraian LIKE ? OR kode LIKE ?)')
+      uParams.push(`%${q}%`, `%${q}%`)
+    }
+    const uRows = appDb
+      .prepare(`SELECT kode, uraian, satuan, parent_kode FROM analisa_user${uWhere.length ? ' WHERE ' + uWhere.join(' AND ') : ''} ORDER BY kode LIMIT ?`)
+      .all(...uParams, limit) as Array<{ kode: string; uraian: string; satuan: string | null; parent_kode: string | null }>
+    const user: ItemSearchResult[] = uRows.map((u) => {
+      const no = u.kode.charAt(0)
+      const d = refDb.prepare('SELECT nama FROM ref_divisi WHERE no = ?').get(no) as { nama: string } | undefined
+      return {
+        id: 0,
+        kode: u.kode,
+        uraian: u.uraian,
+        satuan: u.satuan,
+        level: 0,
+        parent_kode: u.parent_kode,
+        divisi_no: d ? no : null,
+        divisi_nama: d?.nama ?? null,
+        tipe: 'user-analisa',
+        src: 'user'
+      }
+    })
+    return [...ref, ...user]
+  })
+
+  // induk hirarki utk analisa user-defined: hanya NODE GRUP yang benar-benar punya anak
+  // (EXISTS child), bukan item pekerjaan leaf. Level 2-3. Kedalaman beda tiap divisi.
+  ipcMain.handle('ref:parents', () => {
+    return refDb
+      .prepare(
+        `SELECT i.kode, i.uraian, i.level, i.parent_kode,
+                d.no AS divisi_no, d.nama AS divisi_nama
+         FROM ref_item i
+         LEFT JOIN ref_divisi d ON d.no = substr(i.kode, 1, 1)
+         WHERE i.level BETWEEN 2 AND 3
+           AND EXISTS (SELECT 1 FROM ref_item c WHERE c.parent_kode = i.kode)
+         ORDER BY i.kode`
+      )
+      .all()
   })
 
   ipcMain.handle('ref:item', (_e, kode: string) => {
@@ -252,6 +324,16 @@ export function registerIpc() {
     appDb.prepare('SELECT * FROM rab WHERE projek_id = ? ORDER BY created_at').all(projekId)
   )
 
+  ipcMain.handle('rab:meta', (_e, rabId: number) =>
+    appDb.prepare('SELECT * FROM rab WHERE id = ?').get(rabId) ?? null
+  )
+
+  ipcMain.handle('rab:setPpn', (_e, rabId: number, ppnPct: number) => {
+    const pct = Number.isFinite(ppnPct) ? Math.max(0, Math.min(ppnPct, 100)) : 0
+    appDb.prepare('UPDATE rab SET ppn_pct = ?, updated_at = ? WHERE id = ?').run(pct, now(), rabId)
+    return appDb.prepare('SELECT * FROM rab WHERE id = ?').get(rabId)
+  })
+
   ipcMain.handle('rab:create', (_e, projekId: number, nama: string) => {
     const meta = refDb.prepare('SELECT id FROM ref_meta ORDER BY id DESC LIMIT 1').get() as { id: number } | undefined
     const t = now()
@@ -294,9 +376,58 @@ export function registerIpc() {
     })
   })
 
+  // Sisipkan analisa user ke RAB sebagai rab_item (is_user 1), nested di bawah induk bila parent cocok
+  const addAnalisaToRab = (rabId: number, a: { kode: string; uraian: string; satuan: string | null; parent_kode: string | null }, volume: number) => {
+    const komponen = appDb.prepare('SELECT * FROM analisa_user_komponen WHERE analisa_id = ? ORDER BY pos').all(
+      (appDb.prepare('SELECT id FROM analisa_user WHERE kode = ?').get(a.kode) as { id: number } | undefined)?.id ?? -1
+    ) as Array<{
+      jenis: string | null
+      uraian: string | null
+      kode: string | null
+      satuan: string | null
+      koefisien: number | null
+      harga_satuan: number | null
+    }>
+    let parentId: number | null = null
+    let level = 0
+    if (a.parent_kode) {
+      const parent = appDb.prepare('SELECT id, level FROM rab_item WHERE rab_id = ? AND kode = ? LIMIT 1').get(rabId, a.parent_kode) as
+        | { id: number; level: number }
+        | undefined
+      if (parent) {
+        parentId = parent.id
+        level = parent.level + 1
+      }
+    }
+    const pos = (appDb.prepare('SELECT COALESCE(MAX(pos), 0) + 1 AS p FROM rab_item WHERE rab_id = ?').get(rabId) as { p: number }).p
+    const hStmt = appDb.prepare('SELECT harga FROM harga_katalog WHERE jenis = ? AND uraian = ?')
+    appDb.exec('BEGIN;')
+    const res = appDb.prepare(
+      'INSERT INTO rab_item (rab_id, ref_item_id, kode, uraian, satuan, volume, level, parent_id, is_user, pos) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 1, ?)'
+    ).run(rabId, a.kode, a.uraian, a.satuan, Number(volume) || 0, level, parentId, pos)
+    const itemId = Number(res.lastInsertRowid)
+    const ins = appDb.prepare(
+      'INSERT INTO rab_item_komponen (rab_item_id, jenis, uraian, kode, satuan, koefisien, harga_satuan, pos) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+    komponen.forEach((k, i) => {
+      const h = hStmt.get(k.jenis, k.uraian) as { harga: number | null } | undefined
+      const harga = h && typeof h.harga === 'number' ? h.harga : k.harga_satuan
+      ins.run(itemId, k.jenis, k.uraian, k.kode, k.satuan, k.koefisien, harga, i)
+    })
+    appDb.exec('COMMIT;')
+    return appDb.prepare('SELECT * FROM rab_item WHERE id = ?').get(itemId)
+  }
+
   ipcMain.handle('rab:addItem', (_e, rabId: number, kode: string, volume = 0) => {
     const card = refDb.prepare('SELECT * FROM ref_item WHERE kode = ?').get(kode) as Record<string, unknown> | undefined
-    if (!card) throw new Error(`Item referensi tidak ditemukan: ${kode}`)
+    if (!card) {
+      // kode analisa user-defined → route ke pustaka analisa
+      const ua = appDb.prepare('SELECT * FROM analisa_user WHERE kode = ?').get(kode) as
+        | { kode: string; uraian: string; satuan: string | null; parent_kode: string | null }
+        | undefined
+      if (ua) return addAnalisaToRab(rabId, ua, volume)
+      throw new Error(`Item tidak ditemukan: ${kode}`)
+    }
     const komponen = refDb.prepare('SELECT * FROM ref_komponen WHERE item_id = ? ORDER BY pos').all(Number(card.id)) as Record<string, unknown>[]
     const last = appDb.prepare('SELECT MAX(pos) AS m FROM rab_item WHERE rab_id = ?').get(rabId) as { m: number | null }
     appDb.exec('BEGIN;')
@@ -342,16 +473,39 @@ export function registerIpc() {
   })
 
   ipcMain.handle('rab:removeItem', (_e, id: number) => {
+    // kumpulkan item + semua turunannya (parent_id self-ref) dalam satu txn,
+    // lalu hapus baris dependen berurutan agar tidak kena FK constraint.
     appDb.exec('BEGIN;')
     try {
-      appDb
+      const sub = appDb
         .prepare(
-          'DELETE FROM rab_volume_tulangan WHERE rab_volume_id IN (SELECT id FROM rab_volume WHERE rab_item_id = ?)'
+          `WITH RECURSIVE sub(id) AS (
+             SELECT ?
+             UNION ALL
+             SELECT rab_item.id FROM rab_item JOIN sub ON rab_item.parent_id = sub.id
+           ) SELECT id FROM sub`
         )
-        .run(id)
-      appDb.prepare('DELETE FROM rab_volume WHERE rab_item_id = ?').run(id)
-      appDb.prepare('DELETE FROM rab_item_komponen WHERE rab_item_id = ?').run(id)
-      appDb.prepare('DELETE FROM rab_item WHERE id = ?').run(id)
+        .all(id) as { id: number }[]
+      const ids = sub.map((s) => s.id)
+      if (ids.length === 0) {
+        appDb.exec('ROLLBACK;')
+        return { ok: true }
+      }
+      const placeholders = ids.map(() => '?').join(',')
+      const jadwalIds = appDb
+        .prepare(`SELECT id FROM rab_jadwal WHERE rab_item_id IN (${placeholders})`)
+        .all(...ids) as { id: number }[]
+      const jph = jadwalIds.map(() => '?').join(',')
+      if (jph) {
+        appDb.prepare(`DELETE FROM rab_dependensi WHERE jadwal_id IN (${jph}) OR pred_jadwal_id IN (${jph})`).run(...jadwalIds.map((j) => j.id))
+        appDb.prepare(`DELETE FROM rab_jadwal WHERE id IN (${jph})`).run(...jadwalIds.map((j) => j.id))
+      }
+      appDb
+        .prepare(`DELETE FROM rab_volume_tulangan WHERE rab_volume_id IN (SELECT id FROM rab_volume WHERE rab_item_id IN (${placeholders}))`)
+        .run(...ids)
+      appDb.prepare(`DELETE FROM rab_volume WHERE rab_item_id IN (${placeholders})`).run(...ids)
+      appDb.prepare(`DELETE FROM rab_item_komponen WHERE rab_item_id IN (${placeholders})`).run(...ids)
+      appDb.prepare(`DELETE FROM rab_item WHERE id IN (${placeholders})`).run(...ids)
       appDb.exec('COMMIT;')
     } catch (err) {
       appDb.exec('ROLLBACK;')
@@ -512,7 +666,7 @@ export function registerIpc() {
     return appDb.prepare('SELECT * FROM rab_volume WHERE id = ?').get(Number(res.lastInsertRowid))
   })
 
-  ipcMain.handle('rab:updateVolume', (_e, id: number, data: Partial<Pick<{ uraian: string; panjang: number; lebar: number; tinggi: number; jumlah: number }, 'uraian' | 'panjang' | 'lebar' | 'tinggi' | 'jumlah'>>) => {
+  ipcMain.handle('rab:updateVolume', (_e, id: number, data: Partial<Pick<{ uraian: string; panjang: number; lebar: number; tinggi: number; jumlah: number; gambar: string }, 'uraian' | 'panjang' | 'lebar' | 'tinggi' | 'jumlah' | 'gambar'>>) => {
     const fields = Object.keys(data)
     if (!fields.length) return appDb.prepare('SELECT * FROM rab_volume WHERE id = ?').get(id)
     const set = fields.map((f) => `${f} = ?`).join(', ')
@@ -802,6 +956,189 @@ export function registerIpc() {
     } finally {
       if (!win.isDestroyed()) win.destroy()
     }
+  })
+
+  // ── Analisa Builder: pencarian komponen (ref + user) ─────────────────────
+  ipcMain.handle('komponen:search', (_e, q?: string, jenis?: string, limit = 25) => {
+    const whereRef: string[] = []
+    const whereUser: string[] = []
+    const paramsRef: (string | number)[] = []
+    const paramsUser: (string | number)[] = []
+    if (q) {
+      whereRef.push('(m.uraian LIKE ? OR m.kode LIKE ?)')
+      whereUser.push('(u.uraian LIKE ? OR u.kode LIKE ?)')
+      paramsRef.push(`%${q}%`, `%${q}%`)
+      paramsUser.push(`%${q}%`, `%${q}%`)
+    }
+    if (jenis) {
+      whereRef.push('m.jenis = ?')
+      whereUser.push('u.jenis = ?')
+      paramsRef.push(jenis)
+      paramsUser.push(jenis)
+    }
+    const wRef = whereRef.length ? ' WHERE ' + whereRef.join(' AND ') : ''
+    const wUser = whereUser.length ? ' WHERE ' + whereUser.join(' AND ') : ''
+    const ref = refDb
+      .prepare(
+        `SELECT 'ref' AS src, m.id, m.jenis, m.uraian, m.kode, m.satuan
+         FROM ref_master_komponen m${wRef}
+         ORDER BY CASE m.jenis WHEN 'tenaga_kerja' THEN 1 WHEN 'bahan' THEN 2 ELSE 3 END,
+           CASE WHEN m.jenis = 'tenaga_kerja' THEN m.kode ELSE NULL END,
+           CASE WHEN m.jenis != 'tenaga_kerja' THEN m.count END DESC, m.uraian
+         LIMIT ?`
+      )
+      .all(...paramsRef, limit) as Array<Record<string, unknown>>
+    const user = appDb
+      .prepare(
+        `SELECT 'user' AS src, u.id, u.jenis, u.uraian, u.kode, u.satuan
+         FROM komponen_user u${wUser}
+         ORDER BY u.uraian
+         LIMIT ?`
+      )
+      .all(...paramsUser, limit) as Array<Record<string, unknown>>
+
+    const rows = [...ref, ...user]
+    if (!rows.length) return []
+    const hStmt = appDb.prepare('SELECT jenis, uraian, harga FROM harga_katalog WHERE jenis = ? AND uraian = ?')
+    return rows.map((r) => {
+      const j = String(r.jenis ?? '')
+      const u = String(r.uraian ?? '')
+      const h = hStmt.get(j, u) as { harga: number | null } | undefined
+      return {
+        src: r.src as 'ref' | 'user',
+        id: Number(r.id),
+        jenis: j,
+        uraian: u,
+        kode: (r.kode as string | null) ?? null,
+        satuan: (r.satuan as string | null) ?? null,
+        harga_satuan: h && typeof h.harga === 'number' ? h.harga : null
+      }
+    })
+  })
+
+  // Buat komponen user baru (master komponen di appDb + harga_katalog)
+  ipcMain.handle('komponen:create', (_e, data: { jenis: string; uraian: string; kode?: string | null; satuan?: string | null; harga?: number | null }) => {
+    const jenis = normJenis(data.jenis) ?? String(data.jenis ?? '').trim()
+    const uraian = String(data.uraian ?? '').trim()
+    if (!jenis || !uraian) throw new Error('jenis dan uraian wajib diisi')
+    const t = now()
+    appDb.exec('BEGIN;')
+    appDb.prepare(
+      `INSERT INTO komponen_user (jenis, uraian, kode, satuan, created_at) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(jenis, uraian) DO UPDATE SET kode = excluded.kode, satuan = excluded.satuan`
+    ).run(jenis, uraian, data.kode ?? null, data.satuan ?? null, t)
+    const harga = typeof data.harga === 'number' && !Number.isNaN(data.harga) ? data.harga : null
+    if (harga != null) {
+      appDb.prepare(
+        `INSERT INTO harga_katalog (jenis, uraian, harga, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(jenis, uraian) DO UPDATE SET harga = excluded.harga, updated_at = excluded.updated_at`
+      ).run(jenis, uraian, harga, t)
+    }
+    appDb.exec('COMMIT;')
+    return { src: 'user' as const, id: 0, jenis, uraian, kode: data.kode ?? null, satuan: data.satuan ?? null, harga_satuan: harga }
+  })
+
+  // ── Analisa Builder: pustaka analisa user ────────────────────────────────
+  ipcMain.handle('analisa:list', () => {
+    return appDb
+      .prepare(
+        `SELECT a.*, (SELECT COUNT(*) FROM analisa_user_komponen k WHERE k.analisa_id = a.id) AS komponen_count
+         FROM analisa_user a ORDER BY a.pos, a.id`
+      )
+      .all()
+  })
+
+  ipcMain.handle('analisa:get', (_e, id: number) => {
+    const a = appDb.prepare('SELECT * FROM analisa_user WHERE id = ?').get(id) as Record<string, unknown> | undefined
+    if (!a) return null
+    const komponen = appDb.prepare('SELECT * FROM analisa_user_komponen WHERE analisa_id = ? ORDER BY pos').all(id)
+    return { analisa: a, komponen }
+  })
+
+  ipcMain.handle('analisa:save', (_e, data: {
+    id?: number
+    kode: string
+    uraian: string
+    satuan?: string | null
+    parent_kode?: string | null
+    vol_ref?: number | null
+    komponen: Array<{ jenis: string; uraian: string; kode?: string | null; satuan?: string | null; koefisien: number; harga_satuan: number | null; ref_input1?: number | null; ref_input2?: number | null }>
+  }) => {
+    const uraian = String(data.uraian ?? '').trim()
+    if (!uraian) throw new Error('Uraian analisa wajib diisi')
+    const t = now()
+    const parent_kode = data.parent_kode ? String(data.parent_kode) : null
+    const vol_ref = typeof data.vol_ref === 'number' && !Number.isNaN(data.vol_ref) ? data.vol_ref : null
+    let kode = String(data.kode ?? '').trim()
+    if (!kode) {
+      if (parent_kode) {
+        // ${parent}.u{seq} — seq lanjut dari analisa separent yang sudah ada
+        const last = appDb
+          .prepare('SELECT kode FROM analisa_user WHERE kode LIKE ? ORDER BY CAST(REPLACE(kode, ?, ?) AS INTEGER) DESC LIMIT 1')
+          .get(`${parent_kode}.u%`, `${parent_kode}.u`, '') as { kode: string } | undefined
+        const n = last ? Number(last.kode.slice(parent_kode.length + 2)) + 1 : 1
+        kode = `${parent_kode}.u${n}`
+      } else {
+        const last = appDb.prepare("SELECT kode FROM analisa_user WHERE kode LIKE 'U-%' ORDER BY CAST(REPLACE(kode, 'U-', '') AS INTEGER) DESC LIMIT 1").get() as { kode: string } | undefined
+        const n = last ? Number(last.kode.replace('U-', '')) + 1 : 1
+        kode = `U-${n}`
+      }
+    }
+    const komponen = Array.isArray(data.komponen) ? data.komponen : []
+    appDb.exec('BEGIN;')
+    let id: number
+    if (data.id) {
+      appDb.prepare('UPDATE analisa_user SET kode = ?, uraian = ?, satuan = ?, parent_kode = ?, vol_ref = ?, updated_at = ? WHERE id = ?')
+        .run(kode, uraian, data.satuan ?? null, parent_kode, vol_ref, t, data.id)
+      id = data.id
+    } else {
+      const pos = (appDb.prepare('SELECT COALESCE(MAX(pos), 0) + 1 AS p FROM analisa_user').get() as { p: number }).p
+      const res = appDb.prepare('INSERT INTO analisa_user (kode, uraian, satuan, parent_kode, vol_ref, pos, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(kode, uraian, data.satuan ?? null, parent_kode, vol_ref, pos, t, t)
+      id = Number(res.lastInsertRowid)
+    }
+    appDb.prepare('DELETE FROM analisa_user_komponen WHERE analisa_id = ?').run(id)
+    const ins = appDb.prepare(
+      'INSERT INTO analisa_user_komponen (analisa_id, jenis, uraian, kode, satuan, koefisien, harga_satuan, ref_input1, ref_input2, pos) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+    const upsertHarga = appDb.prepare(
+      `INSERT INTO harga_katalog (jenis, uraian, harga, updated_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(jenis, uraian) DO UPDATE SET harga = excluded.harga, updated_at = excluded.updated_at`
+    )
+    komponen.forEach((k, i) => {
+      ins.run(
+        id,
+        k.jenis,
+        k.uraian,
+        k.kode ?? null,
+        k.satuan ?? null,
+        k.koefisien ?? null,
+        k.harga_satuan ?? null,
+        typeof k.ref_input1 === 'number' && !Number.isNaN(k.ref_input1) ? k.ref_input1 : null,
+        typeof k.ref_input2 === 'number' && !Number.isNaN(k.ref_input2) ? k.ref_input2 : null,
+        i
+      )
+      if (k.harga_satuan != null) upsertHarga.run(k.jenis, k.uraian, k.harga_satuan, t)
+    })
+    appDb.exec('COMMIT;')
+    return appDb.prepare('SELECT * FROM analisa_user WHERE id = ?').get(id)
+  })
+
+  ipcMain.handle('analisa:remove', (_e, id: number) => {
+    appDb.exec('BEGIN;')
+    appDb.prepare('DELETE FROM analisa_user_komponen WHERE analisa_id = ?').run(id)
+    appDb.prepare('DELETE FROM analisa_user WHERE id = ?').run(id)
+    appDb.exec('COMMIT;')
+    return { ok: true }
+  })
+
+  // Tambahkan analisa user ke RAB aktif sebagai rab_item (is_user 1)
+  ipcMain.handle('analisa:addToRab', (_e, rabId: number, analisaId: number, volume = 0) => {
+    const a = appDb.prepare('SELECT * FROM analisa_user WHERE id = ?').get(analisaId) as
+      | { kode: string; uraian: string; satuan: string | null; parent_kode: string | null }
+      | undefined
+    if (!a) throw new Error('Analisa tidak ditemukan')
+    return addAnalisaToRab(rabId, a, volume)
   })
 
   return { appDb, refDb }

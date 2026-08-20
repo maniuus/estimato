@@ -100,6 +100,7 @@ export interface Rab {
   nama: string
   ref_id: number | null
   overhead_pct: number
+  ppn_pct: number
   created_at: string
   updated_at: string
 }
@@ -151,6 +152,7 @@ export interface ItemSearchResult {
   divisi_no: string | null
   divisi_nama: string | null
   tipe: string | null
+  src?: 'ref' | 'user'
 }
 
 export interface MasterRow {
@@ -161,6 +163,44 @@ export interface MasterRow {
   satuan: string | null
   count: number
   harga_satuan: number | null
+}
+
+// hasil pencarian komponen gabungan: ref_master_komponen + komponen_user
+export interface KomponenResult {
+  src: 'ref' | 'user'
+  id: number
+  jenis: string
+  uraian: string
+  kode: string | null
+  satuan: string | null
+  harga_satuan: number | null
+}
+
+export interface AnalisaUser {
+  id: number
+  kode: string
+  uraian: string
+  satuan: string | null
+  parent_kode: string | null
+  vol_ref: number | null
+  pos: number
+  created_at: string
+  updated_at: string
+  komponen_count?: number
+}
+
+export interface AnalisaUserKomponen {
+  id: number
+  analisa_id: number
+  jenis: string | null
+  uraian: string | null
+  kode: string | null
+  satuan: string | null
+  koefisien: number | null
+  harga_satuan: number | null
+  ref_input1: number | null
+  ref_input2: number | null
+  pos: number
 }
 
 export interface HitungResult {
@@ -224,6 +264,7 @@ export interface VolumeRow {
   lebar: number | null
   tinggi: number | null
   jumlah: number | null
+  gambar: string | null
   pos: number
   item_kode?: string
   item_uraian?: string
@@ -263,6 +304,7 @@ export interface Api {
     meta: () => Promise<RefMeta | null>
     import: (dataDir: string, asOf: string) => Promise<ImportResult>
     items: (q?: string, divisi?: string, limit?: number) => Promise<ItemSearchResult[]>
+    parents: () => Promise<Array<{ kode: string; uraian: string; level: number; parent_kode: string | null; divisi_no: string | null; divisi_nama: string | null }>>
     item: (kode: string) => Promise<{ item: RefItem; komponen: RefKomponen[] } | null>
     master: (q?: string, jenis?: string) => Promise<MasterRow[]>
     masterBulk: (items: { id: number; hargaSatuan: number | null }[]) => Promise<{ updated: number }>
@@ -278,6 +320,8 @@ export interface Api {
   }
   rab: {
     list: (projekId: number) => Promise<Rab[]>
+    meta: (rabId: number) => Promise<Rab | null>
+    setPpn: (rabId: number, ppnPct: number) => Promise<Rab>
     create: (projekId: number, nama: string) => Promise<Rab>
     remove: (id: number) => Promise<{ ok: boolean }>
     items: (rabId: number) => Promise<RabItem[]>
@@ -290,7 +334,7 @@ export interface Api {
     setHargaKomponen: (rabId: number, jenis: string | null, uraian: string | null, harga: number | null) => Promise<{ ok: boolean }>
     volumes: (rabId: number) => Promise<VolumeRow[]>
     addVolume: (rabItemId: number, uraian: string | null, panjang: number | null, lebar: number | null, tinggi: number | null, jumlah: number | null) => Promise<VolumeRow>
-    updateVolume: (id: number, data: Partial<Pick<VolumeRow, 'uraian' | 'panjang' | 'lebar' | 'tinggi' | 'jumlah'>>) => Promise<VolumeRow>
+    updateVolume: (id: number, data: Partial<Pick<VolumeRow, 'uraian' | 'panjang' | 'lebar' | 'tinggi' | 'jumlah' | 'gambar'>>) => Promise<VolumeRow>
     removeVolume: (id: number) => Promise<{ ok: boolean }>
     tulangan: (rabVolumeId: number) => Promise<TulanganRow[]>
     addTulangan: (rabVolumeId: number, posisi: string | null, jenis: string | null, diameter: number | null, jumlah: number | null, panjang: number | null) => Promise<TulanganRow>
@@ -312,5 +356,16 @@ export interface Api {
   }
   report: {
     pdf: (html: string, defaultName?: string) => Promise<{ ok: boolean; path?: string; canceled?: boolean; error?: string }>
+  }
+  komponen: {
+    search: (q?: string, jenis?: string, limit?: number) => Promise<KomponenResult[]>
+    create: (data: { jenis: string; uraian: string; kode?: string | null; satuan?: string | null; harga?: number | null }) => Promise<KomponenResult>
+  }
+  analisa: {
+    list: () => Promise<AnalisaUser[]>
+    get: (id: number) => Promise<{ analisa: AnalisaUser; komponen: AnalisaUserKomponen[] } | null>
+    save: (data: { id?: number; kode: string; uraian: string; satuan?: string | null; parent_kode?: string | null; vol_ref?: number | null; komponen: Array<{ jenis: string; uraian: string; kode?: string | null; satuan?: string | null; koefisien: number; harga_satuan: number | null; ref_input1?: number | null; ref_input2?: number | null }> }) => Promise<AnalisaUser>
+    remove: (id: number) => Promise<{ ok: boolean }>
+    addToRab: (rabId: number, analisaId: number, volume?: number) => Promise<RabItem>
   }
 }

@@ -6,6 +6,7 @@ const api: Api = {
     meta: () => ipcRenderer.invoke('ref:meta'),
     import: (dataDir, asOf) => ipcRenderer.invoke('ref:import', dataDir, asOf),
     items: (q, divisi, limit) => ipcRenderer.invoke('ref:items', q, divisi, limit),
+    parents: () => ipcRenderer.invoke('ref:parents'),
     item: (kode) => ipcRenderer.invoke('ref:item', kode),
     master: (q, jenis) => ipcRenderer.invoke('ref:master', q, jenis),
     masterBulk: (items) => ipcRenderer.invoke('ref:masterBulk', items),
@@ -21,6 +22,8 @@ const api: Api = {
   },
   rab: {
     list: (projekId) => ipcRenderer.invoke('rab:list', projekId),
+    meta: (rabId) => ipcRenderer.invoke('rab:meta', rabId),
+    setPpn: (rabId, ppnPct) => ipcRenderer.invoke('rab:setPpn', rabId, ppnPct),
     create: (projekId, nama) => ipcRenderer.invoke('rab:create', projekId, nama),
     remove: (id) => ipcRenderer.invoke('rab:remove', id),
     items: (rabId) => ipcRenderer.invoke('rab:items', rabId),
@@ -59,6 +62,17 @@ const api: Api = {
   },
   report: {
     pdf: (html, defaultName) => ipcRenderer.invoke('report:pdf', html, defaultName),
+  },
+  komponen: {
+    search: (q, jenis, limit) => ipcRenderer.invoke('komponen:search', q, jenis, limit),
+    create: (data) => ipcRenderer.invoke('komponen:create', data),
+  },
+  analisa: {
+    list: () => ipcRenderer.invoke('analisa:list'),
+    get: (id) => ipcRenderer.invoke('analisa:get', id),
+    save: (data) => ipcRenderer.invoke('analisa:save', data),
+    remove: (id) => ipcRenderer.invoke('analisa:remove', id),
+    addToRab: (rabId, analisaId, volume) => ipcRenderer.invoke('analisa:addToRab', rabId, analisaId, volume),
   },
 }
 

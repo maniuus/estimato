@@ -129,6 +129,41 @@ export interface RabDependensi {
   pos: number
 }
 
+export interface AnalisaUser {
+  id: number
+  kode: string
+  uraian: string
+  satuan: string | null
+  parent_kode: string | null
+  vol_ref: number | null
+  pos: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AnalisaUserKomponen {
+  id: number
+  analisa_id: number
+  jenis: string | null
+  uraian: string | null
+  kode: string | null
+  satuan: string | null
+  koefisien: number | null
+  harga_satuan: number | null
+  ref_input1: number | null
+  ref_input2: number | null
+  pos: number
+}
+
+export interface KomponenUser {
+  id: number
+  jenis: string | null
+  uraian: string
+  kode: string | null
+  satuan: string | null
+  created_at: string
+}
+
 export const APP_SCHEMA = `
 CREATE TABLE IF NOT EXISTS projek (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,6 +180,7 @@ CREATE TABLE IF NOT EXISTS rab (
   nama TEXT NOT NULL,
   ref_id INTEGER,
   overhead_pct REAL NOT NULL DEFAULT 0.1,
+  ppn_pct REAL NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -200,6 +236,7 @@ CREATE TABLE IF NOT EXISTS rab_volume (
   lebar REAL,
   tinggi REAL,
   jumlah REAL NOT NULL DEFAULT 1,
+  gambar TEXT,
   pos INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_rab_volume_item ON rab_volume(rab_item_id);
@@ -265,4 +302,39 @@ CREATE TABLE IF NOT EXISTS rab_dependensi (
   pos INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_rab_dependensi_jadwal ON rab_dependensi(jadwal_id);
+CREATE TABLE IF NOT EXISTS analisa_user (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kode TEXT NOT NULL,
+  uraian TEXT NOT NULL,
+  satuan TEXT,
+  parent_kode TEXT,
+  vol_ref REAL,
+  pos INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_analisa_user_kode ON analisa_user(kode);
+CREATE TABLE IF NOT EXISTS analisa_user_komponen (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  analisa_id INTEGER NOT NULL REFERENCES analisa_user(id),
+  jenis TEXT,
+  uraian TEXT,
+  kode TEXT,
+  satuan TEXT,
+  koefisien REAL,
+  harga_satuan REAL,
+  ref_input1 REAL,
+  ref_input2 REAL,
+  pos INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_analisa_komponen_analisa ON analisa_user_komponen(analisa_id);
+CREATE TABLE IF NOT EXISTS komponen_user (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  jenis TEXT NOT NULL,
+  uraian TEXT NOT NULL,
+  kode TEXT,
+  satuan TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE(jenis, uraian)
+);
 `

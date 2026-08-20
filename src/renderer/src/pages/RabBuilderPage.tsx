@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { BomRow, DependensiRow, HitungResult, ItemSearchResult, JadwalRow, ProfilTulangan, RabItem, RabItemKomponen, RabProfil, RefBesi, VolumeRow } from '../../../shared/types'
 import { fmt, fmtInputNum, fmtRp, fmtRpShort, parseInputNum, terbilang } from '../lib/format'
+import AnalisaBuilder from '../components/AnalisaBuilder'
 
 const JENIS_LABEL: Record<string, string> = {
   tenaga_kerja: 'Tenaga Kerja',
@@ -186,6 +187,7 @@ export default function RabBuilderPage({
   const [hitung, setHitung] = useState<HitungResult[]>([])
   const [bom, setBom] = useState<BomRow[]>([])
   const [msg, setMsg] = useState<{ t: 'err' | 'ok'; s: string } | null>(null)
+  const [ppn, setPpn] = useState<number>(0)
 
   const [active, setActive] = useState<string>('daftar')
   const [volTarget, setVolTarget] = useState<number | null>(null)
@@ -238,6 +240,8 @@ export default function RabBuilderPage({
   }, [])
 
   const load = async () => {
+    const meta = await window.api.rab.meta(rabId)
+    setPpn(meta?.ppn_pct ?? 0)
     const [it, v, h, b, pr, jd] = await Promise.all([
       window.api.rab.items(rabId),
       window.api.rab.volumes(rabId),
@@ -300,6 +304,12 @@ export default function RabBuilderPage({
     setSearch('')
     if (created) setSelItem(Number(created.id))
     load()
+  }
+
+  const setPpnPersist = async (v: number) => {
+    const pct = Number.isFinite(v) ? Math.max(0, Math.min(v, 100)) : 0
+    setPpn(pct)
+    await window.api.rab.setPpn(rabId, pct)
   }
 
   const addUserItem = async () => {
@@ -442,6 +452,26 @@ export default function RabBuilderPage({
     load()
   }
 
+  // gambar take-off volume — data URL base64 (JPEG/PNG)
+  const saveVolGambar = async (r: VolumeRow, file: File | null) => {
+    if (!file) return
+    if (!/image\/(jpeg|png)/.test(file.type)) {
+      alert('Hanya gambar JPEG atau PNG yang diterima.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = async () => {
+      await window.api.rab.updateVolume(r.id, { gambar: reader.result as string })
+      load()
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const hapusVolGambar = async (r: VolumeRow) => {
+    await window.api.rab.updateVolume(r.id, { gambar: null })
+    load()
+  }
+
   const removeProfile = async (p: RabProfil) => {
     if (!confirm(`Hapus profil "${p.uraian}" beserta seluruh baris tulangannya?`)) return
     await window.api.rab.removeProfile(p.id)
@@ -549,6 +579,12 @@ export default function RabBuilderPage({
 
   const totalRAB = useMemo(() => hitung.reduce((s, h) => s + (h.total ?? 0), 0), [hitung])
   const hByItem = useMemo(() => new Map(hitung.map((h) => [h.item.id, h])), [hitung])
+
+  // PPN per RAB (%): dasar = totalRAB, ppnAmt = dasar × pct, total akhir dibulatkan
+  const ppnPct = (ppn ?? 0) / 100
+  const ppnAmt = totalRAB * ppnPct
+  const dppPpn = totalRAB + ppnAmt
+  const totalAkhir = roundUp(dppPpn)
 
   // kebutuhan batang 12m per profil — Σ total panjang efektif (utama=bentang, sengkang=hitungSengkang)
   const batangPerProfil = useMemo(() => {
@@ -1285,6 +1321,7 @@ export default function RabBuilderPage({
               {dims.includes('tinggi') && <th style={{ width: '9%' }} className="num">Tinggi</th>}
               <th style={{ width: '9%' }} className="num">Jumlah</th>
               <th style={{ width: '11%' }} className="num">Volume</th>
+              <th style={{ width: '12%' }}>Gambar</th>
               <th style={{ width: '9%' }}></th>
             </tr>
           </thead>
@@ -1315,13 +1352,25 @@ export default function RabBuilderPage({
                 ))}
                 <td className="num">{fmt(r.volume)}</td>
                 <td>
+                  <div className="row" style={{ justifyContent: 'flex-start', gap: 6 }}>
+                    <input type="file" accept="image/jpeg,image/png" style={{ display: 'none' }} id={`vg-${r.id}`} onChange={(e) => saveVolGambar(r, e.target.files?.[0] ?? null)} />
+                    {r.gambar ? (
+                      <img src={r.gambar} alt="take-off" style={{ width: 40, height: 40, objectFit: 'contain', border: '1px solid var(--ink)' }} />
+                    ) : (
+                      <button className="mini" onClick={() => document.getElementById(`vg-${r.id}`)?.click()}>Foto</button>
+                    )}
+                    {r.gambar && <button className="mini" onClick={() => document.getElementById(`vg-${r.id}`)?.click()}>Ubah</button>}
+                    {r.gambar && <button className="mini" onClick={() => hapusVolGambar(r)}>X</button>}
+                  </div>
+                </td>
+                <td>
                   <button onClick={() => removeVol(r)}>Hapus</button>
                 </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="empty">Belum ada baris take-off. Tambahkan di bawah.</td>
+                <td colSpan={9} className="empty">Belum ada baris take-off. Tambahkan di bawah.</td>
               </tr>
             )}
           </tbody>
@@ -1939,16 +1988,21 @@ export default function RabBuilderPage({
 
       {msg && <div className={'msg mt ' + msg.t}>{msg.s}</div>}
 
-      <div className="builder mt">
+      <div className="tabs mt">
+        <button className={active === 'daftar' ? 'active' : ''} onClick={() => setActive('daftar')}>[ RAB ]</button>
+        <button className={active === 'volume' ? 'active' : ''} onClick={() => setActive('volume')}>[ Volume ]</button>
+        <button className={active === 'besi' ? 'active' : ''} onClick={() => setActive('besi')}>[ Besi ]</button>
+        <button className={active === 'bom' ? 'active' : ''} onClick={() => setActive('bom')}>[ Bill of Material ]</button>
+        <button className={active === 'jadwal' ? 'active' : ''} onClick={() => setActive('jadwal')}>[ Jadwal ]</button>
+        <button className={active === 'rekap' ? 'active' : ''} onClick={() => setActive('rekap')}>[ Rekapitulasi ]</button>
+        <button className={active === 'analisa' ? 'active' : ''} onClick={() => setActive('analisa')}>[ Analisa Builder ]</button>
+      </div>
+
+      {active === 'analisa' ? (
+        <AnalisaBuilder rabId={rabId} onAddedToRab={load} />
+      ) : (
+        <div className="builder mt">
         <div className="builder-main">
-          <div className="tabs mt">
-            <button className={active === 'daftar' ? 'active' : ''} onClick={() => setActive('daftar')}>[ RAB ]</button>
-            <button className={active === 'volume' ? 'active' : ''} onClick={() => setActive('volume')}>[ Volume ]</button>
-            <button className={active === 'besi' ? 'active' : ''} onClick={() => setActive('besi')}>[ Besi ]</button>
-            <button className={active === 'bom' ? 'active' : ''} onClick={() => setActive('bom')}>[ Bill of Material ]</button>
-            <button className={active === 'jadwal' ? 'active' : ''} onClick={() => setActive('jadwal')}>[ Jadwal ]</button>
-            <button className={active === 'rekap' ? 'active' : ''} onClick={() => setActive('rekap')}>[ Rekapitulasi ]</button>
-          </div>
 
           {active === 'daftar' && (
             <div className="mt">
@@ -1998,13 +2052,41 @@ export default function RabBuilderPage({
                   ))
                 })()}
                 {items.length > 0 && (
-                  <tr className="group-row">
-                    <td colSpan={6}>Total RAB</td>
-                    <td className="num">{fmtRp(totalRAB)}</td>
-                  </tr>
+                  <>
+                    <tr className="group-row">
+                      <td colSpan={6}>Total RAB (DPP)</td>
+                      <td className="num">{fmtRp(totalRAB)}</td>
+                    </tr>
+                    {ppn > 0 && (
+                      <tr className="group-row">
+                        <td colSpan={6}>PPN {ppn}%</td>
+                        <td className="num">{fmtRp(ppnAmt)}</td>
+                      </tr>
+                    )}
+                    <tr className="group-row">
+                      <td colSpan={6}>Total Termasuk PPN{ppn > 0 ? '' : ' (0%)'}</td>
+                      <td className="num">{fmtRp(ppn > 0 ? dppPpn : totalRAB)}</td>
+                    </tr>
+                  </>
                 )}
               </tbody>
             </table>
+            <div className="mt2 row" style={{ alignItems: 'center' }}>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--muted)' }}>PPN</span>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                style={{ width: 90 }}
+                value={Number.isFinite(ppn) ? ppn : ''}
+                onChange={(e) => setPpnPersist(parseFloat(e.target.value) || 0)}
+              />
+              <span style={{ color: 'var(--muted)', fontSize: 12 }}>%</span>
+              {[0, 11, 12].map((p) => (
+                <button key={p} className={ppn === p ? 'mini active' : 'mini'} onClick={() => setPpnPersist(p)}>{p}%</button>
+              ))}
+            </div>
             {items.length === 0 && <div className="empty">Belum ada item. Tambahkan lewat pencarian referensi atau item user.</div>}
           </div>
         </div>
@@ -2151,10 +2233,33 @@ export default function RabBuilderPage({
           </table>
 
           <div className="subtotal mt">
-            <div className="line total"><span>Grand Total</span><b>{fmtRp(totalRAB)}</b></div>
-            <div className="line"><span>Pembulatan (ke atas kelipatan {PEMBULATAN.toLocaleString('id-ID')})</span><b>{fmtRp(roundUp(totalRAB) - totalRAB)}</b></div>
-            <div className="line total f"><span>Total Setelah Pembulatan</span><b>{fmtRp(roundUp(totalRAB))}</b></div>
-            <div className="line"><span>Terbilang</span><b style={{ textTransform: 'none' }}>{terbilang(roundUp(totalRAB))}</b></div>
+            <div className="line"><span>Dasar Pengenaan Pajak (DPP)</span><b>{fmtRp(totalRAB)}</b></div>
+            <div className="line total f"><span>PPN ({ppn}%)</span><b>{fmtRp(ppnAmt)}</b></div>
+            <div className="line total"><span>Total Termasuk PPN</span><b>{fmtRp(dppPpn)}</b></div>
+            <div className="line"><span>Pembulatan (ke atas kelipatan {PEMBULATAN.toLocaleString('id-ID')})</span><b>{fmtRp(totalAkhir - dppPpn)}</b></div>
+            <div className="line total f"><span>Total Setelah Pembulatan</span><b>{fmtRp(totalAkhir)}</b></div>
+            <div className="line"><span>Terbilang</span><b style={{ textTransform: 'none' }}>{terbilang(totalAkhir)}</b></div>
+          </div>
+
+          <div className="mt2" style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+            <div className="kicker" style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--muted)' }}>PPN (Pajak Pertambahan Nilai)</div>
+            <div className="row">
+              <label className="row" style={{ gap: 6, alignItems: 'center' }}>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  style={{ width: 90 }}
+                  value={Number.isFinite(ppn) ? ppn : ''}
+                  onChange={(e) => setPpnPersist(parseFloat(e.target.value) || 0)}
+                />
+                <span>%</span>
+              </label>
+              {[0, 11, 12].map((p) => (
+                <button key={p} className={ppn === p ? 'mini active' : 'mini'} onClick={() => setPpnPersist(p)}>{p}%</button>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -2242,8 +2347,13 @@ export default function RabBuilderPage({
                         </thead>
                         <tbody>
                           {results.map((r) => (
-                            <tr key={r.kode} onClick={() => addKode(r.kode)}>
-                              <td data-click>{r.kode}</td>
+                            <tr key={`${r.src ?? 'ref'}-${r.kode}`} onClick={() => addKode(r.kode)}>
+                              <td data-click>
+                                {r.src === 'user' && (
+                                  <span className="badge-user">USER</span>
+                                )}
+                                {r.kode}
+                              </td>
                               <td data-click style={{ whiteSpace: 'normal' }}>{r.uraian}</td>
                             </tr>
                           ))}
@@ -2304,7 +2414,8 @@ export default function RabBuilderPage({
             </>
           )}
         </div>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
